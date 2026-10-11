@@ -84,13 +84,18 @@ export const PropertyCard: React.FC<PropertyCardProps> = ({ property }) => {
       {/* Details */}
       <div className="p-4 sm:p-5 flex flex-col flex-1">
         {/* Price */}
-        <div className="flex items-baseline justify-between mb-1.5">
+        <div className="flex items-baseline justify-between mb-0.5">
           <span className="text-xl sm:text-2xl font-bold text-emerald-700 tracking-tight">
             {formatPrice(property.price, property.listing_type)}
           </span>
           <span className="text-xs text-slate-700 font-medium capitalize">
             {property.city}
           </span>
+        </div>
+
+        {/* Location Hint */}
+        <div className="text-[11px] font-medium text-slate-500 flex items-center gap-1 mb-2">
+          <span>📍 Location available after unlock</span>
         </div>
 
         {/* Title */}

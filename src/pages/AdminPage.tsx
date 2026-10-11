@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Property, Profile, PropertyStatus, UserRole, Payment, PaymentStatus, PaymentPurpose } from '../types';
+import { Property, Profile, PropertyStatus, UserRole, Payment, PaymentStatus, PaymentPurpose, PropertyLocation } from '../types';
 import { dbService } from '../lib/dbService';
 import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../context/ToastContext';
@@ -36,6 +36,7 @@ export const AdminPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'properties' | 'payments' | 'success_fees' | 'users'>('properties');
   const [properties, setProperties] = useState<Property[]>([]);
+  const [propertyLocations, setPropertyLocations] = useState<Record<string, PropertyLocation>>({});
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [successFees, setSuccessFees] = useState<
@@ -63,16 +64,18 @@ export const AdminPage: React.FC = () => {
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const [allProps, allUsers, allPayments, feeReport] = await Promise.all([
+      const [allProps, allUsers, allPayments, feeReport, allLocations] = await Promise.all([
         dbService.getProperties({ status: 'all' }),
         dbService.getAllProfiles(),
         dbService.getPayments(),
         dbService.getSuccessFeeReport(),
+        dbService.getAllPropertyLocations(),
       ]);
       setProperties(allProps);
       setProfiles(allUsers);
       setPayments(allPayments);
       setSuccessFees(feeReport);
+      setPropertyLocations(allLocations);
     } catch (err) {
       console.error(err);
       showToast('Error loading administrative data', 'error');
@@ -456,6 +459,7 @@ export const AdminPage: React.FC = () => {
                     <th className="py-3 px-4">Property</th>
                     <th className="py-3 px-4">Owner</th>
                     <th className="py-3 px-4">Price</th>
+                    <th className="py-3 px-4">Location</th>
                     <th className="py-3 px-4">Featured Tier</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Views</th>
@@ -465,7 +469,7 @@ export const AdminPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-10 text-slate-400">
+                      <td colSpan={8} className="text-center py-10 text-slate-400">
                         Loading properties...
                       </td>
                     </tr>
@@ -512,6 +516,39 @@ export const AdminPage: React.FC = () => {
                           {/* Price */}
                           <td className="py-3.5 px-4 font-bold text-emerald-700">
                             रू {prop.price.toLocaleString('en-IN')}
+                          </td>
+
+                          {/* Location Column */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {propertyLocations[prop.id] ? (
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-emerald-700">✅ Set</span>
+                                  <a
+                                    href={`https://www.google.com/maps?q=${propertyLocations[prop.id].latitude},${propertyLocations[prop.id].longitude}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[11px] font-bold text-blue-600 hover:text-blue-800 underline inline-flex items-center gap-0.5"
+                                    title="View on Google Maps"
+                                  >
+                                    <span>View</span>
+                                    <ExternalLink className="w-2.5 h-2.5" />
+                                  </a>
+                                </div>
+                                {(propertyLocations[prop.id].updated_at || propertyLocations[prop.id].captured_at) && (
+                                  <div className="text-[10px] text-slate-400 mt-0.5">
+                                    Updated {new Date(
+                                      propertyLocations[prop.id].updated_at || propertyLocations[prop.id].captured_at
+                                    ).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="font-medium text-amber-700">⚠️ Missing</span>
+                            )}
                           </td>
 
                           {/* FEATURED TOGGLE (NEW) */}
@@ -608,7 +645,7 @@ export const AdminPage: React.FC = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} className="text-center py-10 text-slate-400">
+                      <td colSpan={8} className="text-center py-10 text-slate-400">
                         No properties found matching filters.
                       </td>
                     </tr>

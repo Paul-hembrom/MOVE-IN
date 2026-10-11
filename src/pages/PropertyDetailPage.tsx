@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Property, HunterSubscription, HunterPlanTier } from '../types';
+import { Property, PropertyLocation, HunterSubscription, HunterPlanTier } from '../types';
 import { dbService } from '../lib/dbService';
 import { useRouter, Link } from '../context/RouterContext';
 import { ImageGallery } from '../components/ImageGallery';
 import { StatusBadge } from '../components/StatusBadge';
 import { VerificationBadge } from '../components/VerificationBadge';
 import { PropertyCard } from '../components/PropertyCard';
-import { PropertyMap } from '../components/PropertyMap';
 import { PaymentModal } from '../components/PaymentModal';
 import { ChatModal } from '../components/ChatModal';
 import { HunterPlanModal } from '../components/HunterPlanModal';
@@ -30,6 +29,7 @@ import {
   Eye,
   Clock,
   Sparkles,
+  Navigation,
 } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
@@ -43,6 +43,7 @@ export const PropertyDetailPage: React.FC = () => {
 
   // Contact Unlock & Chat State
   const [isUnlocked, setIsUnlocked] = useState(false);
+  const [propertyLocation, setPropertyLocation] = useState<PropertyLocation | null>(null);
   const [daysRemaining, setDaysRemaining] = useState<number | null>(null);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
@@ -75,6 +76,7 @@ export const PropertyDetailPage: React.FC = () => {
       const data = await dbService.getPropertyById(id);
       setProperty(data);
 
+      let unlocked = false;
       if (user) {
         // Load hunter subscription if user is hunter
         const sub = await dbService.getHunterSubscription(user.id);
@@ -84,14 +86,24 @@ export const PropertyDetailPage: React.FC = () => {
         if (user.role === 'admin' || (data && user.id === data.owner_id)) {
           setIsUnlocked(true);
           setDaysRemaining(30);
+          unlocked = true;
         } else if (data) {
           const unlockInfo = await dbService.checkContactUnlocked(user.id, data.id);
           setIsUnlocked(unlockInfo.unlocked);
           setDaysRemaining(unlockInfo.daysRemaining || null);
+          unlocked = unlockInfo.unlocked;
         }
       } else {
         setIsUnlocked(false);
         setDaysRemaining(null);
+      }
+
+      // If unlocked, fetch private location from property_locations table
+      if (unlocked && data && user) {
+        const loc = await dbService.getPropertyLocation(data.id, user.id, user.role);
+        setPropertyLocation(loc);
+      } else {
+        setPropertyLocation(null);
       }
 
       if (data) {
@@ -122,10 +134,13 @@ export const PropertyDetailPage: React.FC = () => {
       if (res.success) {
         setIsUnlocked(true);
         setDaysRemaining(7);
+        // Fetch newly unlocked property location
+        const loc = await dbService.getPropertyLocation(property.id, user.id, user.role);
+        setPropertyLocation(loc);
         // Refresh hunter subscription quota
         const updatedSub = await dbService.getHunterSubscription(user.id);
         setHunterSub(updatedSub);
-        showToast('Contact unlocked using plan quota! Valid for 7 days.', 'success');
+        showToast('Contact & exact location unlocked! Valid for 7 days.', 'success');
       } else {
         showToast(res.error || 'Quota exhausted. Please upgrade your plan.', 'error');
         setHunterPlanModalOpen(true);
@@ -326,24 +341,117 @@ export const PropertyDetailPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Geographic Location Map */}
-              <div className="mt-8 pt-6 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                      Location & Neighborhood
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      {property.address}, {property.city}, {property.district}
-                    </p>
-                  </div>
+              {/* Geographic Location & Google Maps Redirection (No embedded map) */}
+              <div className="mt-8 pt-6 border-t border-slate-100 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                    Location & Directions
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {property.address}, {property.city}, {property.district}
+                  </p>
                 </div>
-                <PropertyMap
-                  properties={[property]}
-                  selectedPropertyId={property.id}
-                  height="340px"
-                  className="w-full"
-                />
+
+                {!isUnlocked ? (
+                  /* Hunter has NOT unlocked: show locked prompt */
+                  <div className="p-6 bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto shadow-2xs">
+                      <Lock className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">
+                        Exact GPS Location & Landmark Hidden
+                      </h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                        General locality: <strong>{property.city}, {property.district}</strong>. Direct Google Maps navigation and owner landmark notes are revealed once contact is unlocked.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleUnlockWithQuota}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>🔒 Unlock to see exact location</span>
+                    </button>
+                  </div>
+                ) : (
+                  /* Hunter HAS unlocked: show Google Maps open button, landmark, and WhatsApp share */
+                  <div className="p-5 sm:p-6 bg-emerald-50/70 rounded-2xl border border-emerald-200/90 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-100/90 px-2.5 py-0.5 rounded-full mb-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Exact GPS Location Unlocked</span>
+                        </div>
+                        <h4 className="text-sm font-extrabold text-slate-900">
+                          Ready for Navigation
+                        </h4>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {propertyLocation?.latitude ? (
+                            <>
+                              GPS: {propertyLocation.latitude.toFixed(5)}, {propertyLocation.longitude.toFixed(5)}
+                              {propertyLocation.accuracy_meters && (
+                                <span className="text-slate-500 ml-1.5">
+                                  (Accuracy: ±{propertyLocation.accuracy_meters}m)
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            'Verified owner property coordinates ready.'
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Primary Button: Open in Google Maps */}
+                      {propertyLocation && (
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${propertyLocation.latitude},${propertyLocation.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 transition-all hover:scale-[1.02] cursor-pointer shrink-0"
+                        >
+                          <Navigation className="w-4 h-4" />
+                          <span>📍 Open in Google Maps</span>
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Landmark text if present */}
+                    {propertyLocation?.landmark && (
+                      <div className="p-3.5 bg-white rounded-xl border border-emerald-200 text-xs text-slate-800 shadow-2xs">
+                        <span className="font-extrabold text-emerald-900 block mb-0.5">
+                          📍 Owner Landmark & Navigation Instructions:
+                        </span>
+                        <p className="text-slate-700 leading-relaxed font-medium">
+                          {propertyLocation.landmark}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Secondary WhatsApp Share Button */}
+                    {propertyLocation && (
+                      <div className="pt-2 border-t border-emerald-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <span className="text-[11px] text-slate-500">
+                          Visiting with roommates or family?
+                        </span>
+                        <a
+                          href={`https://wa.me/?text=${encodeURIComponent(
+                            `Check out this property in ${property.city} on Move-In: ${property.title}\n📍 Google Maps Directions: https://www.google.com/maps/dir/?api=1&destination=${propertyLocation.latitude},${propertyLocation.longitude}${
+                              propertyLocation.landmark ? `\nLandmark: ${propertyLocation.landmark}` : ''
+                            }`
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-xs transition-colors cursor-pointer self-start sm:self-auto"
+                        >
+                          <span>💬 Share on WhatsApp</span>
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -561,9 +669,13 @@ export const PropertyDetailPage: React.FC = () => {
           amount={99}
           purpose="contact_unlock"
           propertyId={property.id}
-          onSuccess={() => {
+          onSuccess={async () => {
             setIsUnlocked(true);
             setDaysRemaining(7);
+            if (user) {
+              const loc = await dbService.getPropertyLocation(property.id, user.id, user.role);
+              setPropertyLocation(loc);
+            }
           }}
         />
 

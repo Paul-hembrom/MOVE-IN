@@ -35,25 +35,3 @@
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out forwards;
 }
-
-/* Leaflet Custom Styling for Move-In */
-.leaflet-popup-content-wrapper {
-  border-radius: 1rem !important;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
-  padding: 4px !important;
-  border: 1px solid #e2e8f0 !important;
-}
-
-.leaflet-popup-content {
-  margin: 8px 10px !important;
-  line-height: 1.4 !important;
-}
-
-.leaflet-popup-tip {
-  background: white !important;
-}
-
-.movein-map-marker {
-  background: transparent !important;
-  border: none !important;
-}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Property, PropertyType, ListingType, PropertyStatus, Subscription, PaymentPurpose } from '../types';
 import { dbService } from '../lib/dbService';
+import { reverseGeocodeNominatim, searchAddressNominatim } from '../lib/nominatim';
 import { StatusBadge } from '../components/StatusBadge';
 import { PaymentModal } from '../components/PaymentModal';
 import { useToast } from '../context/ToastContext';
@@ -25,6 +26,9 @@ import {
   KeyRound,
   AlertCircle,
   RefreshCw,
+  MapPin,
+  Crosshair,
+  Loader2,
 } from 'lucide-react';
 import { Link } from '../context/RouterContext';
 
@@ -75,6 +79,18 @@ export const DashboardPage: React.FC = () => {
   const [bedrooms, setBedrooms] = useState<number>(2);
   const [bathrooms, setBathrooms] = useState<number>(1);
   const [areaSqft, setAreaSqft] = useState<number>(650);
+
+  // Property Location state (private coordinates saved to property_locations)
+  const [capturedLat, setCapturedLat] = useState<number | null>(null);
+  const [capturedLng, setCapturedLng] = useState<number | null>(null);
+  const [capturedAccuracy, setCapturedAccuracy] = useState<number | null>(null);
+  const [landmark, setLandmark] = useState('');
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
+  const [showAddressSearch, setShowAddressSearch] = useState(false);
+  const [addressSearchQuery, setAddressSearchQuery] = useState('');
+  const [addressSearchLoading, setAddressSearchLoading] = useState(false);
+  const [addressSearchResults, setAddressSearchResults] = useState<any[]>([]);
 
   // Uploaded Images state (can be existing URLs or new Files)
   const [imageFiles, setImageFiles] = useState<{ file?: File; previewUrl: string; isPrimary: boolean }[]>([]);
@@ -127,6 +143,15 @@ export const DashboardPage: React.FC = () => {
     setBathrooms(1);
     setAreaSqft(650);
     setImageFiles([]);
+    setCapturedLat(null);
+    setCapturedLng(null);
+    setCapturedAccuracy(null);
+    setLandmark('');
+    setGeoLoading(false);
+    setGeoError(null);
+    setShowAddressSearch(false);
+    setAddressSearchQuery('');
+    setAddressSearchResults([]);
   };
 
   const handleOpenAddModal = () => {
@@ -148,6 +173,25 @@ export const DashboardPage: React.FC = () => {
     setBedrooms(prop.bedrooms);
     setBathrooms(prop.bathrooms);
     setAreaSqft(prop.area_sqft);
+    setCapturedLat(null);
+    setCapturedLng(null);
+    setCapturedAccuracy(null);
+    setLandmark('');
+    setGeoLoading(false);
+    setGeoError(null);
+    setShowAddressSearch(false);
+    setAddressSearchQuery('');
+    setAddressSearchResults([]);
+
+    // Load property location from property_locations table
+    dbService.getPropertyLocation(prop.id, user?.id, user?.role).then((loc) => {
+      if (loc) {
+        setCapturedLat(loc.latitude);
+        setCapturedLng(loc.longitude);
+        setCapturedAccuracy(loc.accuracy_meters || null);
+        setLandmark(loc.landmark || '');
+      }
+    });
 
     // Existing images
     if (prop.images && prop.images.length > 0) {
@@ -162,6 +206,128 @@ export const DashboardPage: React.FC = () => {
     }
 
     setIsModalOpen(true);
+  };
+
+  // High-accuracy GPS geolocation with Nominatim reverse-geocoding
+  const handleUseCurrentLocation = () => {
+    setGeoLoading(true);
+    setGeoError(null);
+
+    if (!navigator.geolocation) {
+      const msg = 'Geolocation is not supported by your browser. Please search address instead.';
+      setGeoError(msg);
+      setGeoLoading(false);
+      setShowAddressSearch(true);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = Math.round(pos.coords.accuracy);
+
+        setCapturedLat(lat);
+        setCapturedLng(lng);
+        setCapturedAccuracy(accuracy);
+        setGeoLoading(false);
+        showToast(`GPS location captured! Accuracy: ±${accuracy}m`, 'success');
+
+        // Reverse Geocode using Nominatim (with 1-second debounce rate-limiting)
+        try {
+          const data = await reverseGeocodeNominatim(lat, lng);
+          if (data && data.address) {
+            const a = data.address;
+            const road =
+              a.road ||
+              a.suburb ||
+              a.neighbourhood ||
+              a.village ||
+              data.display_name?.split(',')[0] ||
+              '';
+            const matchedCity =
+              a.city || a.town || a.municipality || a.county || '';
+            const matchedDistrict =
+              a.state_district || a.county || matchedCity || '';
+
+            if (road) setAddress(road);
+            if (matchedCity) {
+              const knownCities = ['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'Chitwan', 'Butwal'];
+              const found = knownCities.find((c) =>
+                matchedCity.toLowerCase().includes(c.toLowerCase())
+              );
+              if (found) setCity(found);
+              else setCity(matchedCity);
+            }
+            if (matchedDistrict) {
+              const knownDistricts = ['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Kaski', 'Chitwan'];
+              const found = knownDistricts.find((d) =>
+                matchedDistrict.toLowerCase().includes(d.toLowerCase())
+              );
+              if (found) setDistrict(found);
+            }
+            showToast('Address details auto-filled from GPS', 'info');
+          }
+        } catch (err) {
+          console.warn('Reverse geocode error:', err);
+        }
+      },
+      (err) => {
+        setGeoLoading(false);
+        let msg = 'GPS location unavailable. Please search address instead.';
+        if (err.code === err.PERMISSION_DENIED) {
+          msg = 'Location permission denied. Please allow location permissions in your browser or search address below.';
+        } else if (err.code === err.TIMEOUT) {
+          msg = 'Location request timed out. Please try again or search address below.';
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          msg = 'GPS location unavailable. Please search address below.';
+        }
+        setGeoError(msg);
+        setShowAddressSearch(true);
+        showToast(msg, 'error');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    );
+  };
+
+  // Fallback: Nominatim search for place/address in Nepal (with 1-second debounce rate-limiting)
+  const handleSearchAddress = async () => {
+    if (!addressSearchQuery.trim()) return;
+    setAddressSearchLoading(true);
+    try {
+      const data = await searchAddressNominatim(addressSearchQuery.trim());
+      setAddressSearchResults(data || []);
+      if (!data || data.length === 0) {
+        showToast('No matching locations found in Nepal. Try a broader search.', 'info');
+      }
+    } catch (e) {
+      console.warn('Search address error:', e);
+      showToast('Error searching address', 'error');
+    } finally {
+      setAddressSearchLoading(false);
+    }
+  };
+
+  const handleSelectAddressResult = (item: any) => {
+    const lat = parseFloat(item.lat);
+    const lon = parseFloat(item.lon);
+    setCapturedLat(lat);
+    setCapturedLng(lon);
+    setCapturedAccuracy(20);
+    const parts = item.display_name.split(',');
+    setAddress(parts[0] || item.name || addressSearchQuery);
+    const knownCities = ['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'Chitwan', 'Butwal'];
+    const matched = knownCities.find((c) =>
+      item.display_name.toLowerCase().includes(c.toLowerCase())
+    );
+    if (matched) setCity(matched);
+    setAddressSearchResults([]);
+    setGeoError(null);
+    showToast(`Coordinates captured for ${parts[0]}`, 'success');
   };
 
   // Drag and Drop & File Upload handling
@@ -264,6 +430,16 @@ export const DashboardPage: React.FC = () => {
         );
 
         if (updated) {
+          // Save location to property_locations table
+          if (capturedLat !== null && capturedLng !== null) {
+            await dbService.savePropertyLocation({
+              property_id: editingPropertyId,
+              latitude: capturedLat,
+              longitude: capturedLng,
+              accuracy_meters: capturedAccuracy || undefined,
+              landmark: landmark.trim() || undefined,
+            });
+          }
           showToast('Property updated successfully!', 'success');
           setIsModalOpen(false);
           await loadOwnerProperties();
@@ -293,7 +469,17 @@ export const DashboardPage: React.FC = () => {
         );
 
         if (created) {
-          showToast('Property listed successfully!', 'success');
+          // Save location to property_locations table
+          if (capturedLat !== null && capturedLng !== null) {
+            await dbService.savePropertyLocation({
+              property_id: created.id,
+              latitude: capturedLat,
+              longitude: capturedLng,
+              accuracy_meters: capturedAccuracy || undefined,
+              landmark: landmark.trim() || undefined,
+            });
+          }
+          showToast('Property listed successfully with location!', 'success');
           setIsModalOpen(false);
           await loadOwnerProperties();
         } else {
@@ -765,11 +951,177 @@ export const DashboardPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* GPS Location Capture Section */}
+              <div className="p-4 bg-emerald-50/70 rounded-2xl border border-emerald-200/90 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-emerald-600" />
+                      Property Exact Location (Google Maps)
+                    </span>
+                    <p className="text-[11px] text-emerald-800 mt-0.5">
+                      Kept private until hunter unlocks your contact. Enables 1-click Google Maps navigation.
+                    </p>
+                  </div>
+
+                  {/* Use My Current Location Button */}
+                  <button
+                    type="button"
+                    onClick={handleUseCurrentLocation}
+                    disabled={geoLoading}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                  >
+                    {geoLoading ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Detecting GPS...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Crosshair className="w-3.5 h-3.5" />
+                        <span>📍 Use My Current Location</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Captured GPS Details */}
+                {capturedLat !== null && capturedLng !== null && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-white rounded-xl border border-emerald-300/80 text-xs shadow-2xs">
+                    <div className="flex items-center gap-2 text-emerald-900">
+                      <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>
+                        <strong>Captured:</strong> {capturedLat.toFixed(5)}, {capturedLng.toFixed(5)}
+                        {capturedAccuracy && (
+                          <span className="text-slate-500 ml-1.5">
+                            (Accuracy: ±{capturedAccuracy}m)
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${capturedLat},${capturedLng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-emerald-700 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <span>Preview in Google Maps</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                )}
+
+                {/* Clear Error Notification */}
+                {geoError && (
+                  <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-xs text-rose-800 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="font-semibold">{geoError}</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressSearch(true)}
+                        className="text-rose-900 underline font-bold mt-1 inline-block cursor-pointer"
+                      >
+                        Search address instead →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fallback prompt if not triggered */}
+                {!geoError && !showAddressSearch && (capturedLat === null || capturedLng === null) && (
+                  <div className="text-[11px] text-emerald-900">
+                    <span>GPS not working or adding from another location? </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddressSearch(true)}
+                      className="text-emerald-700 hover:text-emerald-900 font-bold underline cursor-pointer"
+                    >
+                      Search address instead
+                    </button>
+                  </div>
+                )}
+
+                {/* Fallback: Nominatim Address Search */}
+                {showAddressSearch && (
+                  <div className="p-3 bg-white rounded-xl border border-slate-200 space-y-2 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-800">
+                        Search address in Nepal (Nominatim OpenStreetMap)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddressSearch(false)}
+                        className="text-xs text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. Baneshwor Chowk, Kathmandu or Lakeside Pokhara"
+                        value={addressSearchQuery}
+                        onChange={(e) => setAddressSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleSearchAddress();
+                          }
+                        }}
+                        className="flex-1 text-xs px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSearchAddress}
+                        disabled={addressSearchLoading}
+                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {addressSearchLoading ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Search className="w-3.5 h-3.5" />
+                        )}
+                        <span>Search</span>
+                      </button>
+                    </div>
+                    {addressSearchResults.length > 0 && (
+                      <div className="divide-y divide-slate-100 max-h-40 overflow-y-auto border border-slate-100 rounded-xl">
+                        {addressSearchResults.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => handleSelectAddressResult(item)}
+                            className="w-full text-left p-2.5 hover:bg-emerald-50 text-xs text-slate-700 hover:text-emerald-950 transition-colors block cursor-pointer"
+                          >
+                            📍 {item.display_name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Optional Landmark text input */}
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-emerald-950 mb-1">
+                    Landmark & Navigation Instructions (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Behind Civil Mall, 2nd house with black gate, near Ganesh Temple"
+                    value={landmark}
+                    onChange={(e) => setLandmark(e.target.value)}
+                    className="w-full text-xs px-3 py-2.5 bg-white border border-emerald-300/80 rounded-xl focus:outline-none text-slate-800"
+                  />
+                </div>
+              </div>
+
               {/* Location: Address, City, District */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                    Address / Landmark *
+                    Address *
                   </label>
                   <input
                     type="text"

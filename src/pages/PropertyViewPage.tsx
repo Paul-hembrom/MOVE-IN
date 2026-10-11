@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Property, PropertyFilterState, HunterSubscription, HunterPlanTier } from '../types';
 import { dbService } from '../lib/dbService';
 import { PropertyCard } from '../components/PropertyCard';
-import { PropertyMap } from '../components/PropertyMap';
 import { HunterPlanModal } from '../components/HunterPlanModal';
 import { PaymentModal } from '../components/PaymentModal';
 import { useRouter } from '../context/RouterContext';
@@ -60,10 +59,6 @@ export const PropertyViewPage: React.FC = () => {
 
   // Filter for verified properties
   const [verifiedOnly, setVerifiedOnly] = useState(false);
-
-  // View Mode: 'split' (side by side), 'grid' (cards only), 'map' (large map)
-  const [viewMode, setViewMode] = useState<'split' | 'grid' | 'map'>('split');
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
   // Initialize filters from searchParams or defaults
   const [filters, setFilters] = useState<PropertyFilterState>(() => ({
@@ -219,11 +214,6 @@ export const PropertyViewPage: React.FC = () => {
     Boolean(filters.searchQuery),
   ].filter(Boolean).length;
 
-  const selectedProperty = useMemo(() => {
-    if (!selectedPropertyId) return null;
-    return filteredProperties.find((p) => p.id === selectedPropertyId) || null;
-  }, [selectedPropertyId, filteredProperties]);
-
   return (
     <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
       {/* Header & Quick Search Bar */}
@@ -323,48 +313,6 @@ export const PropertyViewPage: React.FC = () => {
                 {city === 'All' ? 'All Nepal' : city}
               </button>
             ))}
-          </div>
-
-          {/* View Mode Toggle (Grid, Split, Map) */}
-          <div className="flex items-center gap-1 bg-white p-1 rounded-2xl border border-slate-200 shadow-2xs shrink-0 self-end sm:self-auto">
-            <button
-              onClick={() => setViewMode('split')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                viewMode === 'split'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              title="Split View (List + Map)"
-            >
-              <Columns2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Split Map</span>
-            </button>
-
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              title="Grid View"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Grid</span>
-            </button>
-
-            <button
-              onClick={() => setViewMode('map')}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
-                viewMode === 'map'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              title="Full Map View"
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Map Only</span>
-            </button>
           </div>
         </div>
       </div>
@@ -653,160 +601,42 @@ export const PropertyViewPage: React.FC = () => {
             </div>
           </div>
 
-          {/* VIEW MODE 1: SPLIT MAP VIEW */}
-          {viewMode === 'split' && (
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-              {/* Left Column: Properties list (7 cols on xl) */}
-              <div className="xl:col-span-7 space-y-6">
-                {loading ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className="bg-white rounded-2xl h-80 animate-pulse border border-slate-200"
-                      />
-                    ))}
-                  </div>
-                ) : filteredProperties.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {filteredProperties.map((property) => (
-                      <div
-                        key={property.id}
-                        onMouseEnter={() => setSelectedPropertyId(property.id)}
-                        className={`transition-all rounded-2xl ${
-                          selectedPropertyId === property.id
-                            ? 'ring-2 ring-emerald-500 shadow-md scale-101'
-                            : ''
-                        }`}
-                      >
-                        <PropertyCard property={property} />
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center">
-                    <Building2 className="w-10 h-10 text-slate-400 mx-auto mb-2" />
-                    <h3 className="text-base font-bold text-slate-900">No Properties Found</h3>
-                    <p className="text-xs text-slate-500 mt-1 mb-4">
-                      Try resetting filters to view listings.
-                    </p>
-                    <button
-                      onClick={handleResetFilters}
-                      className="px-3.5 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold"
-                    >
-                      Reset Filters
-                    </button>
-                  </div>
-                )}
+          {/* PROPERTIES GRID VIEW (Clean, fast, no embedded map for hunters) */}
+          <div>
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-white rounded-2xl h-84 animate-pulse border border-slate-200"
+                  />
+                ))}
               </div>
-
-              {/* Right Column: Interactive Leaflet Map (5 cols on xl, sticky) */}
-              <div className="xl:col-span-5 sticky top-24">
-                <PropertyMap
-                  properties={filteredProperties}
-                  selectedPropertyId={selectedPropertyId}
-                  onSelectProperty={(prop) => setSelectedPropertyId(prop?.id || null)}
-                  height="640px"
-                />
+            ) : filteredProperties.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredProperties.map((property) => (
+                  <PropertyCard key={property.id} property={property} />
+                ))}
               </div>
-            </div>
-          )}
-
-          {/* VIEW MODE 2: GRID VIEW ONLY */}
-          {viewMode === 'grid' && (
-            <div>
-              {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div
-                      key={i}
-                      className="bg-white rounded-2xl h-84 animate-pulse border border-slate-200"
-                    />
-                  ))}
+            ) : (
+              <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center my-6">
+                <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
+                  <Building2 className="w-8 h-8" />
                 </div>
-              ) : filteredProperties.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {filteredProperties.map((property) => (
-                    <PropertyCard key={property.id} property={property} />
-                  ))}
-                </div>
-              ) : (
-                <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center my-6">
-                  <div className="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-4">
-                    <Building2 className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-lg font-bold text-slate-900 mb-1">No Matching Properties Found</h3>
-                  <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-6">
-                    Try widening your price range, clearing specific filters, or searching in a different city.
-                  </p>
-                  <button
-                    onClick={handleResetFilters}
-                    className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    Reset All Filters
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* VIEW MODE 3: FULL MAP VIEW */}
-          {viewMode === 'map' && (
-            <div className="relative">
-              <PropertyMap
-                properties={filteredProperties}
-                selectedPropertyId={selectedPropertyId}
-                onSelectProperty={(prop) => setSelectedPropertyId(prop?.id || null)}
-                height="700px"
-              />
-
-              {/* Bottom Card Preview on Full Map if a property is selected */}
-              {selectedProperty && (
-                <div className="absolute bottom-5 left-5 right-5 sm:left-auto sm:right-5 sm:max-w-md z-20 animate-slide-in">
-                  <div className="bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200 shadow-2xl overflow-hidden p-3 relative">
-                    <button
-                      onClick={() => setSelectedPropertyId(null)}
-                      className="absolute top-2 right-2 p-1 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                    <div className="flex gap-3">
-                      <img
-                        src={
-                          selectedProperty.images?.[0]?.image_url ||
-                          'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=300&q=80'
-                        }
-                        alt=""
-                        className="w-24 h-20 rounded-xl object-cover shrink-0"
-                      />
-                      <div className="flex-1 min-w-0 pr-6">
-                        <span className="text-sm font-extrabold text-emerald-700 block">
-                          रू {selectedProperty.price.toLocaleString('en-IN')}{' '}
-                          {selectedProperty.listing_type === 'rent' ? '/mo' : ''}
-                        </span>
-                        <h4 className="text-xs font-bold text-slate-900 truncate">
-                          {selectedProperty.title}
-                        </h4>
-                        <p className="text-[11px] text-slate-500 truncate">
-                          📍 {selectedProperty.address}, {selectedProperty.city}
-                        </p>
-                        <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-100 text-[10px] text-slate-600 font-semibold">
-                          <span>{selectedProperty.bedrooms} Bed • {selectedProperty.bathrooms} Bath</span>
-                          <a
-                            href={`/property/${selectedProperty.id}`}
-                            className="text-emerald-700 hover:underline font-bold"
-                          >
-                            Open Details →
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                <h3 className="text-lg font-bold text-slate-900 mb-1">No Matching Properties Found</h3>
+                <p className="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto mb-6">
+                  Try widening your price range, clearing specific filters, or searching in a different city.
+                </p>
+                <button
+                  onClick={handleResetFilters}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Reset All Filters
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

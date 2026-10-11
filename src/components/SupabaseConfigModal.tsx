@@ -52,7 +52,41 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   starts_at timestamptz DEFAULT now(),
   expires_at timestamptz NOT NULL,
   created_at timestamptz DEFAULT now()
-);`;
+);
+
+-- PROPERTY LOCATIONS TABLE (Strict RLS: owner sees own, admin sees all, hunter sees only if unlocked)
+CREATE TABLE IF NOT EXISTS property_locations (
+  property_id text PRIMARY KEY REFERENCES properties(id) ON DELETE CASCADE,
+  latitude double precision NOT NULL,
+  longitude double precision NOT NULL,
+  accuracy_meters numeric,
+  landmark text,
+  maps_url text,
+  captured_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE property_locations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins have full access to property locations"
+  ON property_locations FOR ALL
+  TO authenticated
+  USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
+
+CREATE POLICY "Owners can view and manage their own property locations"
+  ON property_locations FOR ALL
+  TO authenticated
+  USING (EXISTS (SELECT 1 FROM properties WHERE properties.id = property_locations.property_id AND properties.owner_id = auth.uid()));
+
+CREATE POLICY "Hunters can view unlocked property locations"
+  ON property_locations FOR SELECT
+  TO authenticated
+  USING (EXISTS (
+    SELECT 1 FROM contact_unlocks
+    WHERE contact_unlocks.property_id = property_locations.property_id
+      AND contact_unlocks.user_id = auth.uid()
+      AND contact_unlocks.expires_at > now()
+  ));`;
 
 export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
   isOpen,

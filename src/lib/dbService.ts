@@ -9,6 +9,7 @@ import {
   INITIAL_CONVERSATIONS,
   INITIAL_CHAT_MESSAGES,
   INITIAL_LEADS,
+  INITIAL_PROPERTY_LOCATIONS,
 } from './mockData';
 import {
   Profile,
@@ -24,6 +25,7 @@ import {
   Conversation,
   ChatMessage,
   OwnerLead,
+  PropertyLocation,
 } from '../types';
 
 const STORAGE_PROPS_KEY = 'movein_local_properties';
@@ -35,15 +37,7 @@ const STORAGE_HUNTER_SUBS_KEY = 'movein_local_hunter_subscriptions';
 const STORAGE_CONVERSATIONS_KEY = 'movein_local_conversations';
 const STORAGE_MESSAGES_KEY = 'movein_local_messages';
 const STORAGE_LEADS_KEY = 'movein_local_leads';
-
-const CITY_COORDS: Record<string, [number, number]> = {
-  Kathmandu: [27.7172, 85.324],
-  Lalitpur: [27.671, 85.32],
-  Bhaktapur: [27.671, 85.4298],
-  Pokhara: [28.2096, 83.9595],
-  Chitwan: [27.6833, 84.4333],
-  Butwal: [27.7006, 83.4484],
-};
+const STORAGE_LOCATIONS_KEY = 'movein_local_property_locations';
 
 // Initialize local store if not already set
 const getLocalProperties = (): Property[] => {
@@ -54,32 +48,29 @@ const getLocalProperties = (): Property[] => {
       localStorage.setItem(STORAGE_PROPS_KEY, JSON.stringify(INITIAL_PROPERTIES));
       return INITIAL_PROPERTIES;
     }
-    const parsed: Property[] = JSON.parse(raw);
-    // Ensure all properties have coordinates
-    let updated = false;
-    const enriched = parsed.map((p) => {
-      if (!p.latitude || !p.longitude) {
-        const initialMatch = INITIAL_PROPERTIES.find((init) => init.id === p.id);
-        if (initialMatch && initialMatch.latitude && initialMatch.longitude) {
-          updated = true;
-          return { ...p, latitude: initialMatch.latitude, longitude: initialMatch.longitude };
-        }
-        const base = CITY_COORDS[p.city] || CITY_COORDS.Kathmandu;
-        updated = true;
-        return {
-          ...p,
-          latitude: base[0] + (Math.random() - 0.5) * 0.02,
-          longitude: base[1] + (Math.random() - 0.5) * 0.02,
-        };
-      }
-      return p;
-    });
-    if (updated) {
-      localStorage.setItem(STORAGE_PROPS_KEY, JSON.stringify(enriched));
-    }
-    return enriched;
+    return JSON.parse(raw);
   } catch {
     return INITIAL_PROPERTIES;
+  }
+};
+
+const getLocalLocations = (): PropertyLocation[] => {
+  if (typeof window === 'undefined') return INITIAL_PROPERTY_LOCATIONS;
+  try {
+    const raw = localStorage.getItem(STORAGE_LOCATIONS_KEY);
+    if (!raw) {
+      localStorage.setItem(STORAGE_LOCATIONS_KEY, JSON.stringify(INITIAL_PROPERTY_LOCATIONS));
+      return INITIAL_PROPERTY_LOCATIONS;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return INITIAL_PROPERTY_LOCATIONS;
+  }
+};
+
+const saveLocalLocations = (locations: PropertyLocation[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_LOCATIONS_KEY, JSON.stringify(locations));
   }
 };
 
@@ -385,12 +376,6 @@ export const dbService = {
     const generatedId = 'prop-' + Date.now();
     const createdAt = new Date().toISOString();
 
-    const baseCoords = CITY_COORDS[propertyData.city] || CITY_COORDS.Kathmandu;
-    const finalLat =
-      propertyData.latitude || baseCoords[0] + (Math.random() - 0.5) * 0.02;
-    const finalLng =
-      propertyData.longitude || baseCoords[1] + (Math.random() - 0.5) * 0.02;
-
     // Process images
     const uploadedImages: PropertyImage[] = [];
 
@@ -457,8 +442,6 @@ export const dbService = {
               address: propertyData.address,
               city: propertyData.city,
               district: propertyData.district,
-              latitude: finalLat,
-              longitude: finalLng,
               bedrooms: propertyData.bedrooms,
               bathrooms: propertyData.bathrooms,
               area_sqft: propertyData.area_sqft,
@@ -496,8 +479,6 @@ export const dbService = {
     const newProperty: Property = {
       ...propertyData,
       id: generatedId,
-      latitude: finalLat,
-      longitude: finalLng,
       created_at: createdAt,
       images: uploadedImages,
       views_count: 1,
@@ -1421,6 +1402,137 @@ export const dbService = {
     return result;
   },
 
+  // 7. PROPERTY LOCATIONS (Private coordinates, accessible only to owner, admin, or unlocked hunters)
+  async getPropertyLocation(
+    propertyId: string,
+    userId?: string,
+    userRole?: string
+  ): Promise<PropertyLocation | null> {
+    const props = getLocalProperties();
+    let prop = props.find((p) => p.id === propertyId);
+    if (!prop) {
+      const fetched = await this.getPropertyById(propertyId);
+      if (fetched) prop = fetched;
+    }
+
+    // Permission Check:
+    // Admin sees all
+    // Owner sees own property
+    // Hunter sees ONLY if contact_unlocks row exists and hasn't expired
+    let isAllowed = false;
+    if (userRole === 'admin') {
+      isAllowed = true;
+    } else if (userId && prop && prop.owner_id === userId) {
+      isAllowed = true;
+    } else if (userId) {
+      const unlockStatus = await this.checkContactUnlocked(userId, propertyId);
+      if (unlockStatus.unlocked) {
+        isAllowed = true;
+      }
+    }
+
+    if (!isAllowed) {
+      return null;
+    }
+
+    const client = getSupabaseClient();
+    if (client && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await client
+          .from('property_locations')
+          .select('*')
+          .eq('property_id', propertyId)
+          .single();
+        if (!error && data) {
+          return data as PropertyLocation;
+        }
+      } catch (err) {
+        console.warn('Supabase getPropertyLocation error:', err);
+      }
+    }
+
+    const localLocs = getLocalLocations();
+    return localLocs.find((loc) => loc.property_id === propertyId) || null;
+  },
+
+  // Admin access to load all property locations
+  async getAllPropertyLocations(): Promise<Record<string, PropertyLocation>> {
+    const client = getSupabaseClient();
+    const result: Record<string, PropertyLocation> = {};
+
+    if (client && isSupabaseConfigured()) {
+      try {
+        const { data, error } = await client
+          .from('property_locations')
+          .select('*');
+        if (!error && data) {
+          data.forEach((item: any) => {
+            result[item.property_id] = item as PropertyLocation;
+          });
+          return result;
+        }
+      } catch (err) {
+        console.warn('Supabase getAllPropertyLocations error, fallback to local:', err);
+      }
+    }
+
+    const localLocs = getLocalLocations();
+    localLocs.forEach((loc) => {
+      result[loc.property_id] = loc;
+    });
+    return result;
+  },
+
+  async savePropertyLocation(data: {
+    property_id: string;
+    latitude: number;
+    longitude: number;
+    accuracy_meters?: number;
+    landmark?: string;
+    maps_url?: string;
+  }): Promise<PropertyLocation> {
+    const captured_at = new Date().toISOString();
+    const updated_at = new Date().toISOString();
+    const maps_url =
+      data.maps_url ||
+      `https://www.google.com/maps/dir/?api=1&destination=${data.latitude},${data.longitude}`;
+
+    const newLocation: PropertyLocation = {
+      property_id: data.property_id,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      accuracy_meters: data.accuracy_meters,
+      landmark: data.landmark,
+      maps_url,
+      captured_at,
+      updated_at,
+    };
+
+    const client = getSupabaseClient();
+    if (client && isSupabaseConfigured()) {
+      try {
+        await client.from('property_locations').upsert({
+          property_id: newLocation.property_id,
+          latitude: newLocation.latitude,
+          longitude: newLocation.longitude,
+          accuracy_meters: newLocation.accuracy_meters,
+          landmark: newLocation.landmark,
+          maps_url: newLocation.maps_url,
+          captured_at: newLocation.captured_at,
+          updated_at: newLocation.updated_at,
+        });
+      } catch (err) {
+        console.warn('Supabase savePropertyLocation error, saving local:', err);
+      }
+    }
+
+    const current = getLocalLocations().filter(
+      (l) => l.property_id !== data.property_id
+    );
+    saveLocalLocations([newLocation, ...current]);
+    return newLocation;
+  },
+
   // Reset to default sample data if user wants to reload demo
   resetDemoData() {
     if (typeof window !== 'undefined') {
@@ -1433,6 +1545,7 @@ export const dbService = {
       localStorage.setItem(STORAGE_CONVERSATIONS_KEY, JSON.stringify(INITIAL_CONVERSATIONS));
       localStorage.setItem(STORAGE_MESSAGES_KEY, JSON.stringify(INITIAL_CHAT_MESSAGES));
       localStorage.setItem(STORAGE_LEADS_KEY, JSON.stringify(INITIAL_LEADS));
+      localStorage.setItem(STORAGE_LOCATIONS_KEY, JSON.stringify(INITIAL_PROPERTY_LOCATIONS));
     }
   },
 };

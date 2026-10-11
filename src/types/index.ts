@@ -30,6 +30,17 @@ export interface PropertyImage {
   created_at?: string;
 }
 
+export interface PropertyLocation {
+  property_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy_meters?: number;
+  landmark?: string;
+  maps_url?: string;
+  captured_at: string;
+  updated_at?: string;
+}
+
 export interface Property {
   id: string;
   owner_id: string;
@@ -42,8 +53,6 @@ export interface Property {
   address: string;
   city: string;
   district: string;
-  latitude?: number;
-  longitude?: number;
   bedrooms: number;
   bathrooms: number;
   area_sqft: number;
@@ -62,6 +71,7 @@ export interface Property {
   amenities?: string[];
   images?: PropertyImage[];
   owner?: Profile;
+  location?: PropertyLocation;
 }
 
 export type PaymentPurpose =
