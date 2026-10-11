@@ -32,7 +32,7 @@ export const INITIAL_PROFILES: Profile[] = [
   },
   {
     id: 'user-hunter-1',
-    email: 'hunter@sajilokotha.com',
+    email: 'hunter@movein.com',
     full_name: 'Bikash Tamang',
     role: 'hunter',
     phone: '+977-9818554433',
@@ -41,8 +41,8 @@ export const INITIAL_PROFILES: Profile[] = [
   },
   {
     id: 'user-admin-1',
-    email: 'admin@sajilokotha.com',
-    full_name: 'SajiloKotha Admin',
+    email: 'admin@movein.com',
+    full_name: 'Move-In Admin',
     role: 'admin',
     phone: '+977-9801122334',
     avatar_url: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=200&q=80',

@@ -14,7 +14,7 @@ export const Footer: React.FC = () => {
                 <Home className="w-5 h-5" />
               </div>
               <span className="text-2xl font-extrabold tracking-tight text-white">
-                Sajilo<span className="text-emerald-400">Kotha</span>
+                Move-<span className="text-emerald-400">In</span>
               </span>
             </div>
             <p className="text-slate-400 text-sm max-w-sm leading-relaxed">
@@ -98,8 +98,8 @@ export const Footer: React.FC = () => {
               </li>
               <li className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
-                <a href="mailto:support@sajilokotha.com.np" className="hover:text-emerald-400 transition-colors">
-                  support@sajilokotha.com.np
+                <a href="mailto:support@movein.com.np" className="hover:text-emerald-400 transition-colors">
+                  support@movein.com.np
                 </a>
               </li>
             </ul>
@@ -108,7 +108,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} SajiloKotha Technologies Pvt. Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} Move-In Technologies Pvt. Ltd. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span className="hover:text-slate-400 cursor-pointer">Terms of Service</span>
             <span className="hover:text-slate-400 cursor-pointer">Privacy Policy</span>

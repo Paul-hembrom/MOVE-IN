@@ -63,7 +63,7 @@ export const LoginPage: React.FC = () => {
             <Home className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Sign in to SajiloKotha
+            Sign in to Move-In
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             Access your verified listings, inquiries, or room hunt

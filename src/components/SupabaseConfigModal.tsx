@@ -15,7 +15,7 @@ interface SupabaseConfigModalProps {
   onConfigChanged?: () => void;
 }
 
-const SQL_SCHEMA = `-- SajiloKotha Monetization & Platform Tables:
+const SQL_SCHEMA = `-- Move-In Monetization & Platform Tables:
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS is_featured boolean DEFAULT false;
 ALTER TABLE properties ADD COLUMN IF NOT EXISTS views integer DEFAULT 0;
 

@@ -46,7 +46,7 @@ export const Navbar: React.FC = () => {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-xl font-extrabold tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">
-                    Sajilo<span className="text-emerald-600">Kotha</span>
+                    Move-<span className="text-emerald-600">In</span>
                   </span>
                   <span className="text-[10px] text-slate-700 tracking-wider uppercase font-semibold">
                     Nepal Real Estate

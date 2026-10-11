@@ -242,7 +242,7 @@ export const LandingPage: React.FC = () => {
               Simple & Transparent
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 mt-2 mb-4">
-              How SajiloKotha Works
+              How Move-In Works
             </h2>
             <p className="text-slate-600 text-sm sm:text-base">
               A hassle-free real estate experience built specifically for renters, buyers, and property owners in Nepal.
@@ -382,7 +382,7 @@ export const LandingPage: React.FC = () => {
             </div>
             <h3 className="font-bold text-slate-900 text-base mb-2">Zero Brokerage Charges</h3>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Why pay 50% of your first month's rent to local middle-men? On SajiloKotha, tenants contact house owners directly for free.
+              Why pay 50% of your first month's rent to local middle-men? On Move-In, tenants contact house owners directly for free.
             </p>
           </div>
 

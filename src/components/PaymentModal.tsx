@@ -48,7 +48,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   if (!isOpen) return null;
 
   const merchantPhone = '9841234567';
-  const merchantName = 'SajiloKotha Technologies Pvt. Ltd.';
+  const merchantName = 'Move-In Technologies Pvt. Ltd.';
 
   const handleCopyPhone = () => {
     if (navigator.clipboard) {

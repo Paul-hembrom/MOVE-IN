@@ -34,7 +34,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         </div>
         <h2 className="text-xl font-bold text-slate-900 mb-2">Authentication Required</h2>
         <p className="text-sm text-slate-600 mb-6">
-          Please log in to your account to view this section of SajiloKotha.
+          Please log in to your account to view this section of Move-In.
         </p>
         <div className="flex flex-col gap-3">
           <Link

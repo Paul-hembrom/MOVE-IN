@@ -8,13 +8,13 @@ export const getSupabaseConfig = () => {
   const url =
     env.SUPABASE_URL ||
     (typeof process !== 'undefined' ? (process.env?.SUPABASE_URL as string | undefined) : '') ||
-    (typeof window !== 'undefined' ? localStorage.getItem('sajilokotha_supabase_url') : '') ||
+    (typeof window !== 'undefined' ? localStorage.getItem('movein_supabase_url') : '') ||
     '';
 
   const anonKey =
     env.SUPABASE_ANON_KEY ||
     (typeof process !== 'undefined' ? (process.env?.SUPABASE_ANON_KEY as string | undefined) : '') ||
-    (typeof window !== 'undefined' ? localStorage.getItem('sajilokotha_supabase_anon_key') : '') ||
+    (typeof window !== 'undefined' ? localStorage.getItem('movein_supabase_anon_key') : '') ||
     '';
 
   return {
@@ -66,11 +66,11 @@ export const isSupabaseConfigured = (): boolean => {
 
 export const saveCustomSupabaseConfig = (url: string, anonKey: string) => {
   if (typeof window !== 'undefined') {
-    if (url) localStorage.setItem('sajilokotha_supabase_url', url.trim());
-    else localStorage.removeItem('sajilokotha_supabase_url');
+    if (url) localStorage.setItem('movein_supabase_url', url.trim());
+    else localStorage.removeItem('movein_supabase_url');
 
-    if (anonKey) localStorage.setItem('sajilokotha_supabase_anon_key', anonKey.trim());
-    else localStorage.removeItem('sajilokotha_supabase_anon_key');
+    if (anonKey) localStorage.setItem('movein_supabase_anon_key', anonKey.trim());
+    else localStorage.removeItem('movein_supabase_anon_key');
 
     cachedClient = null;
     cachedUrl = '';

@@ -285,7 +285,7 @@ export const AdminPage: React.FC = () => {
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-bold mb-2">
               <ShieldCheck className="w-4 h-4" />
-              <span>SajiloKotha Administration & Monetization Portal</span>
+              <span>Move-In Administration & Monetization Portal</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
               Platform Moderation & Financial Center
@@ -800,7 +800,7 @@ export const AdminPage: React.FC = () => {
             <div className="p-4 sm:p-6 border-b border-slate-100">
               <h3 className="text-base font-extrabold text-slate-900">Success Fee Ledger</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Tracks owners whose properties were rented or sold through SajiloKotha (Rs 500 room / Rs 1,000 flat)
+                Tracks owners whose properties were rented or sold through Move-In (Rs 500 room / Rs 1,000 flat)
               </p>
             </div>
 

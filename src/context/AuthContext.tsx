@@ -23,7 +23,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const CURRENT_USER_STORAGE = 'sajilokotha_auth_user';
+const CURRENT_USER_STORAGE = 'movein_auth_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<Profile | null>(null);
@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     // Local fallback check
-    const localProfilesRaw = localStorage.getItem('sajilokotha_local_profiles');
+    const localProfilesRaw = localStorage.getItem('movein_local_profiles');
     const localProfiles: Profile[] = localProfilesRaw
       ? JSON.parse(localProfilesRaw)
       : INITIAL_PROFILES;
@@ -197,16 +197,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       created_at: new Date().toISOString(),
     };
 
-    const localProfilesRaw = localStorage.getItem('sajilokotha_local_profiles');
+    const localProfilesRaw = localStorage.getItem('movein_local_profiles');
     const localProfiles: Profile[] = localProfilesRaw
       ? JSON.parse(localProfilesRaw)
       : INITIAL_PROFILES;
 
     const updated = [newLocalUser, ...localProfiles];
-    localStorage.setItem('sajilokotha_local_profiles', JSON.stringify(updated));
+    localStorage.setItem('movein_local_profiles', JSON.stringify(updated));
     setUser(newLocalUser);
     localStorage.setItem(CURRENT_USER_STORAGE, JSON.stringify(newLocalUser));
-    showToast(`Welcome to SajiloKotha, ${fullName}! Account created.`, 'success');
+    showToast(`Welcome to Move-In, ${fullName}! Account created.`, 'success');
     return { success: true };
   };
 

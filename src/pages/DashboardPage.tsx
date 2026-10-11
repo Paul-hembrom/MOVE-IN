@@ -673,7 +673,7 @@ export const DashboardPage: React.FC = () => {
                 <p className="text-xs text-slate-500">
                   {editingPropertyId
                     ? 'Update specs, description, pricing and photos'
-                    : 'Fill in details to post your space on SajiloKotha'}
+                    : 'Fill in details to post your space on Move-In'}
                 </p>
               </div>
               <button
@@ -1138,7 +1138,7 @@ export const DashboardPage: React.FC = () => {
               </div>
               <p className="text-[11px] text-slate-600 leading-relaxed">
                 Broker agents in Nepal charge <strong>50% to 100%</strong> of the first month's rent (Rs 10,000+).
-                SajiloKotha charged you <strong>Rs 0</strong> to list with direct tenant calls.
+                Move-In charged you <strong>Rs 0</strong> to list with direct tenant calls.
                 Paying this modest success fee helps keep our listings verified and broker-free.
               </p>
             </div>
@@ -1153,7 +1153,7 @@ export const DashboardPage: React.FC = () => {
                   setPaymentConfig({
                     isOpen: true,
                     title: `Success Fee for ${prop.title}`,
-                    subtitle: `Thank you for contributing to SajiloKotha's broker-free community`,
+                    subtitle: `Thank you for contributing to Move-In's broker-free community`,
                     amount: fee,
                     purpose: 'success_fee',
                     propertyId: prop.id,

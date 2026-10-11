@@ -59,7 +59,7 @@ export const RegisterPage: React.FC = () => {
             <UserPlus className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Create SajiloKotha Account
+            Create Move-In Account
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             Join Nepal's premier direct housing network

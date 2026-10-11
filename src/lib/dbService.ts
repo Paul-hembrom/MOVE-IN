@@ -26,15 +26,15 @@ import {
   OwnerLead,
 } from '../types';
 
-const STORAGE_PROPS_KEY = 'sajilokotha_local_properties';
-const STORAGE_PROFILES_KEY = 'sajilokotha_local_profiles';
-const STORAGE_PAYMENTS_KEY = 'sajilokotha_local_payments';
-const STORAGE_UNLOCKS_KEY = 'sajilokotha_local_contact_unlocks';
-const STORAGE_SUBSCRIPTIONS_KEY = 'sajilokotha_local_subscriptions';
-const STORAGE_HUNTER_SUBS_KEY = 'sajilokotha_local_hunter_subscriptions';
-const STORAGE_CONVERSATIONS_KEY = 'sajilokotha_local_conversations';
-const STORAGE_MESSAGES_KEY = 'sajilokotha_local_messages';
-const STORAGE_LEADS_KEY = 'sajilokotha_local_leads';
+const STORAGE_PROPS_KEY = 'movein_local_properties';
+const STORAGE_PROFILES_KEY = 'movein_local_profiles';
+const STORAGE_PAYMENTS_KEY = 'movein_local_payments';
+const STORAGE_UNLOCKS_KEY = 'movein_local_contact_unlocks';
+const STORAGE_SUBSCRIPTIONS_KEY = 'movein_local_subscriptions';
+const STORAGE_HUNTER_SUBS_KEY = 'movein_local_hunter_subscriptions';
+const STORAGE_CONVERSATIONS_KEY = 'movein_local_conversations';
+const STORAGE_MESSAGES_KEY = 'movein_local_messages';
+const STORAGE_LEADS_KEY = 'movein_local_leads';
 
 const CITY_COORDS: Record<string, [number, number]> = {
   Kathmandu: [27.7172, 85.324],
@@ -1269,7 +1269,7 @@ export const dbService = {
     // Broadcast in-app event for immediate real-time sync across components/tabs
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
-        new CustomEvent('sajilo_chat_broadcast', {
+        new CustomEvent('movein_chat_broadcast', {
           detail: { conversationId, message: newMsg },
         })
       );
@@ -1330,13 +1330,13 @@ export const dbService = {
     };
 
     if (typeof window !== 'undefined') {
-      window.addEventListener('sajilo_chat_broadcast', handleLocalBroadcast);
+      window.addEventListener('movein_chat_broadcast', handleLocalBroadcast);
     }
 
     // Return cleanup unsubscribe function
     return () => {
       if (typeof window !== 'undefined') {
-        window.removeEventListener('sajilo_chat_broadcast', handleLocalBroadcast);
+        window.removeEventListener('movein_chat_broadcast', handleLocalBroadcast);
       }
       if (supabaseChannel && client) {
         client.removeChannel(supabaseChannel);

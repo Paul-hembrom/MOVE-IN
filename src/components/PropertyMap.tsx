@@ -130,7 +130,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
 
       // Custom HTML Marker Element
       const customIcon = L.divIcon({
-        className: 'sajilo-map-marker',
+        className: 'movein-map-marker',
         html: `
           <div class="px-2.5 py-1 rounded-full font-bold text-xs shadow-md border transition-all duration-200 cursor-pointer flex items-center gap-1 ${
             isSelected
@@ -176,7 +176,7 @@ export const PropertyMap: React.FC<PropertyMapProps> = ({
       marker.bindPopup(popupContent, {
         offset: [0, -10],
         maxWidth: 260,
-        className: 'sajilo-leaflet-popup',
+        className: 'movein-leaflet-popup',
       });
 
       marker.on('popupopen', () => {
