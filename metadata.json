@@ -1,0 +1,6 @@
+{
+  "name": "SajiloKotha",
+  "description": "Full-stack real estate platform for Nepal to easily find, rent, buy, and manage rooms, flats, and properties.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
