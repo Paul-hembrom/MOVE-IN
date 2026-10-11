@@ -4,15 +4,16 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 export const getSupabaseConfig = () => {
   const env = (import.meta as unknown as { env: Record<string, string | undefined> }).env || {};
 
+  // Standard safe environment variable configuration
   const url =
-    env.VITE_SUPABASE_URL ||
-    env.NEXT_PUBLIC_SUPABASE_URL ||
+    env.SUPABASE_URL ||
+    (typeof process !== 'undefined' ? (process.env?.SUPABASE_URL as string | undefined) : '') ||
     (typeof window !== 'undefined' ? localStorage.getItem('sajilokotha_supabase_url') : '') ||
     '';
 
   const anonKey =
-    env.VITE_SUPABASE_ANON_KEY ||
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    env.SUPABASE_ANON_KEY ||
+    (typeof process !== 'undefined' ? (process.env?.SUPABASE_ANON_KEY as string | undefined) : '') ||
     (typeof window !== 'undefined' ? localStorage.getItem('sajilokotha_supabase_anon_key') : '') ||
     '';
 

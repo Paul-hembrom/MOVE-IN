@@ -177,7 +177,7 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
         <form onSubmit={handleTestAndSave} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              NEXT_PUBLIC_SUPABASE_URL
+              SUPABASE_URL
             </label>
             <input
               type="text"
@@ -190,7 +190,7 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-              NEXT_PUBLIC_SUPABASE_ANON_KEY
+              SUPABASE_ANON_KEY
             </label>
             <input
               type="password"

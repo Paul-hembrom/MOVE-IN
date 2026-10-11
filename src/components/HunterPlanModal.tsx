@@ -93,6 +93,7 @@ export const HunterPlanModal: React.FC<HunterPlanModalProps> = ({
       name: 'Assisted Search',
       price: 999,
       duration: '60 Days',
+      contacts: 999999,
       badge: 'VIP White Glove',
       features: [
         'Unlimited Owner unlocks',
