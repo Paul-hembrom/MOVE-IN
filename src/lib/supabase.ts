@@ -6,12 +6,20 @@ export const getSupabaseConfig = () => {
 
   const url =
     env.SUPABASE_URL ||
-    (typeof process !== 'undefined' ? (process.env?.SUPABASE_URL as string | undefined) : '') ||
+    env.VITE_SUPABASE_URL ||
+    (typeof process !== 'undefined'
+      ? (process.env?.SUPABASE_URL as string | undefined) ||
+        (process.env?.VITE_SUPABASE_URL as string | undefined)
+      : '') ||
     '';
 
   const anonKey =
     env.SUPABASE_ANON_KEY ||
-    (typeof process !== 'undefined' ? (process.env?.SUPABASE_ANON_KEY as string | undefined) : '') ||
+    env.VITE_SUPABASE_ANON_KEY ||
+    (typeof process !== 'undefined'
+      ? (process.env?.SUPABASE_ANON_KEY as string | undefined) ||
+        (process.env?.VITE_SUPABASE_ANON_KEY as string | undefined)
+      : '') ||
     '';
 
   return {

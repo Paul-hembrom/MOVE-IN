@@ -39,9 +39,26 @@ const STORAGE_MESSAGES_KEY = 'movein_local_messages';
 const STORAGE_LEADS_KEY = 'movein_local_leads';
 const STORAGE_LOCATIONS_KEY = 'movein_local_property_locations';
 
+export const generateUUID = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 // Initialize local store if not already set
 const getLocalProperties = (): Property[] => {
-  if (typeof window === 'undefined') return INITIAL_PROPERTIES;
+  if (typeof window === 'undefined') {
+    return isSupabaseConfigured() ? [] : INITIAL_PROPERTIES;
+  }
+  // When Supabase is configured, NEVER seed or return mock properties
+  if (isSupabaseConfigured()) {
+    return [];
+  }
   try {
     const raw = localStorage.getItem(STORAGE_PROPS_KEY);
     if (!raw) {
@@ -55,7 +72,13 @@ const getLocalProperties = (): Property[] => {
 };
 
 const getLocalLocations = (): PropertyLocation[] => {
-  if (typeof window === 'undefined') return INITIAL_PROPERTY_LOCATIONS;
+  if (typeof window === 'undefined') {
+    return isSupabaseConfigured() ? [] : INITIAL_PROPERTY_LOCATIONS;
+  }
+  // When Supabase is configured, NEVER seed or return mock locations
+  if (isSupabaseConfigured()) {
+    return [];
+  }
   try {
     const raw = localStorage.getItem(STORAGE_LOCATIONS_KEY);
     if (!raw) {
@@ -64,7 +87,7 @@ const getLocalLocations = (): PropertyLocation[] => {
     }
     return JSON.parse(raw);
   } catch {
-    return INITIAL_PROPERTY_LOCATIONS;
+    return [];
   }
 };
 
@@ -250,48 +273,46 @@ export const dbService = {
     const client = getSupabaseClient();
 
     if (client && isSupabaseConfigured()) {
-      try {
-        let query = client
-          .from('properties')
-          .select(`
-            *,
-            property_images (*),
-            owner:profiles (*)
-          `)
-          .order('is_featured', { ascending: false })
-          .order('created_at', { ascending: false });
+      let query = client
+        .from('properties')
+        .select(`
+          *,
+          property_images (*),
+          owner:profiles (*)
+        `)
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false });
 
-        if (options?.status && options.status !== 'all') {
-          query = query.eq('status', options.status);
-        } else if (!options?.status) {
-          // By default only available properties
-          query = query.eq('status', 'available');
-        }
-
-        if (options?.ownerId) {
-          query = query.eq('owner_id', options.ownerId);
-        }
-
-        if (options?.limit) {
-          query = query.limit(options.limit);
-        }
-
-        const { data, error } = await query;
-        if (error) {
-          console.warn('Supabase getProperties returned error, falling back to local data:', error.message);
-        } else if (data && data.length > 0) {
-          return data.map((item: any) => ({
-            ...item,
-            images: item.property_images || [],
-            owner: item.owner || undefined,
-          })) as Property[];
-        }
-      } catch (err) {
-        console.warn('Supabase fetch exception:', err);
+      if (options?.status && options.status !== 'all') {
+        query = query.eq('status', options.status);
+      } else if (!options?.status) {
+        // By default only available properties
+        query = query.eq('status', 'available');
       }
+
+      if (options?.ownerId) {
+        query = query.eq('owner_id', options.ownerId);
+      }
+
+      if (options?.limit) {
+        query = query.limit(options.limit);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.error('Supabase getProperties returned error:', error);
+        throw new Error(`Failed to load properties from database: ${error.message}`);
+      }
+
+      // If Supabase is configured and query succeeded, ALWAYS return data (even if empty array)
+      return (data || []).map((item: any) => ({
+        ...item,
+        images: item.property_images || [],
+        owner: item.owner || undefined,
+      })) as Property[];
     }
 
-    // Fallback / Local mode
+    // Fallback / Local mode ONLY when Supabase is NOT configured
     let list = getLocalProperties();
     const profiles = getLocalProfiles();
 
@@ -331,31 +352,31 @@ export const dbService = {
     const client = getSupabaseClient();
 
     if (client && isSupabaseConfigured()) {
-      try {
-        const { data, error } = await client
-          .from('properties')
-          .select(`
-            *,
-            property_images (*),
-            owner:profiles (*)
-          `)
-          .eq('id', id)
-          .single();
+      const { data, error } = await client
+        .from('properties')
+        .select(`
+          *,
+          property_images (*),
+          owner:profiles (*)
+        `)
+        .eq('id', id)
+        .maybeSingle();
 
-        if (error) {
-          console.warn('Supabase getPropertyById error:', error.message);
-        } else if (data) {
-          return {
-            ...data,
-            images: data.property_images || [],
-            owner: data.owner || undefined,
-          } as Property;
-        }
-      } catch (err) {
-        console.warn('Supabase getPropertyById exception:', err);
+      if (error) {
+        console.error('Supabase getPropertyById error:', error);
+        throw new Error(`Failed to fetch property details: ${error.message}`);
       }
+
+      if (!data) return null;
+
+      return {
+        ...data,
+        images: data.property_images || [],
+        owner: data.owner || undefined,
+      } as Property;
     }
 
+    // Local mode ONLY when Supabase is NOT configured
     const localList = getLocalProperties();
     const found = localList.find((p) => p.id === id);
     if (!found) return null;
@@ -373,49 +394,142 @@ export const dbService = {
     imageFilesOrUrls: (string | File)[]
   ): Promise<Property> {
     const client = getSupabaseClient();
-    const generatedId = 'prop-' + Date.now();
+    const generatedId = generateUUID();
     const createdAt = new Date().toISOString();
 
-    // Process images
-    const uploadedImages: PropertyImage[] = [];
+    if (client && isSupabaseConfigured()) {
+      // Ensure owner_id matches authenticated Supabase user if session exists
+      let ownerId = propertyData.owner_id;
+      try {
+        const { data: authData } = await client.auth.getUser();
+        if (authData?.user?.id) {
+          ownerId = authData.user.id;
+        }
+      } catch {
+        // Keep provided owner_id
+      }
 
-    for (let i = 0; i < imageFilesOrUrls.length; i++) {
-      const item = imageFilesOrUrls[i];
-      let imageUrl = '';
+      // 1. Check and upload images to Supabase Storage 'property-images' bucket
+      const uploadedImages: PropertyImage[] = [];
 
-      if (typeof item === 'string') {
-        imageUrl = item;
-      } else {
-        // Try uploading to Supabase Storage if available
-        if (client && isSupabaseConfigured()) {
-          try {
-            const fileExt = item.name.split('.').pop() || 'jpg';
-            const fileName = `${generatedId}_${Date.now()}_${i}.${fileExt}`;
-            const { data: uploadData, error: uploadError } = await client.storage
-              .from('property-images')
-              .upload(fileName, item);
+      for (let i = 0; i < imageFilesOrUrls.length; i++) {
+        const item = imageFilesOrUrls[i];
+        let imageUrl = '';
 
-            if (!uploadError && uploadData) {
-              const { data: publicUrlData } = client.storage
-                .from('property-images')
-                .getPublicUrl(fileName);
-              imageUrl = publicUrlData.publicUrl;
-            }
-          } catch (e) {
-            console.warn('Storage upload error, fallback to data URL', e);
+        if (typeof item === 'string') {
+          imageUrl = item;
+        } else {
+          const fileExt = item.name.split('.').pop()?.toLowerCase() || 'jpg';
+          const sanitizedFileName = `${generatedId}_${Date.now()}_${i}.${fileExt}`;
+
+          const { error: uploadError } = await client.storage
+            .from('property-images')
+            .upload(sanitizedFileName, item, {
+              cacheControl: '3600',
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error('Supabase storage upload error:', uploadError);
+            throw new Error(`Failed to upload photo "${item.name}": ${uploadError.message}`);
           }
+
+          const { data: publicUrlData } = client.storage
+            .from('property-images')
+            .getPublicUrl(sanitizedFileName);
+
+          if (!publicUrlData?.publicUrl) {
+            throw new Error(`Failed to generate public URL for photo "${item.name}".`);
+          }
+
+          imageUrl = publicUrlData.publicUrl;
         }
 
-        // Fallback to data URL
-        if (!imageUrl) {
-          imageUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(item);
-          });
+        uploadedImages.push({
+          id: generateUUID(),
+          property_id: generatedId,
+          image_url: imageUrl,
+          is_primary: i === 0,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      // 2. Insert property row into Supabase 'properties' table
+      const { data: propData, error: propError } = await client
+        .from('properties')
+        .insert([
+          {
+            id: generatedId,
+            owner_id: ownerId,
+            title: propertyData.title,
+            description: propertyData.description,
+            property_type: propertyData.property_type,
+            listing_type: propertyData.listing_type,
+            price: propertyData.price,
+            negotiable: propertyData.negotiable ?? false,
+            address: propertyData.address,
+            city: propertyData.city,
+            district: propertyData.district,
+            bedrooms: propertyData.bedrooms,
+            bathrooms: propertyData.bathrooms,
+            area_sqft: propertyData.area_sqft,
+            status: propertyData.status || 'available',
+            created_at: createdAt,
+          },
+        ])
+        .select()
+        .single();
+
+      if (propError) {
+        console.error('Supabase properties insert error:', propError);
+        throw new Error(`Failed to insert property into database: ${propError.message}`);
+      }
+
+      if (!propData) {
+        throw new Error('Supabase did not return the created property record.');
+      }
+
+      // 3. Insert images into Supabase 'property_images' table
+      if (uploadedImages.length > 0) {
+        const { error: imgError } = await client
+          .from('property_images')
+          .insert(
+            uploadedImages.map((img) => ({
+              id: img.id,
+              property_id: generatedId,
+              image_url: img.image_url,
+              is_primary: img.is_primary,
+              created_at: img.created_at || createdAt,
+            }))
+          );
+
+        if (imgError) {
+          console.error('Supabase property_images insert error:', imgError);
+          throw new Error(`Failed to register property images in database: ${imgError.message}`);
         }
       }
 
+      // Return only when property exists in Supabase
+      return {
+        ...propData,
+        images: uploadedImages,
+      } as Property;
+    }
+
+    // Local save ONLY when Supabase is NOT configured
+    const uploadedImages: PropertyImage[] = [];
+    for (let i = 0; i < imageFilesOrUrls.length; i++) {
+      const item = imageFilesOrUrls[i];
+      let imageUrl = '';
+      if (typeof item === 'string') {
+        imageUrl = item;
+      } else {
+        imageUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(item);
+        });
+      }
       uploadedImages.push({
         id: `img-${Date.now()}-${i}`,
         property_id: generatedId,
@@ -425,57 +539,6 @@ export const dbService = {
       });
     }
 
-    if (client && isSupabaseConfigured()) {
-      try {
-        const { data: propData, error: propError } = await client
-          .from('properties')
-          .insert([
-            {
-              id: generatedId,
-              owner_id: propertyData.owner_id,
-              title: propertyData.title,
-              description: propertyData.description,
-              property_type: propertyData.property_type,
-              listing_type: propertyData.listing_type,
-              price: propertyData.price,
-              negotiable: propertyData.negotiable,
-              address: propertyData.address,
-              city: propertyData.city,
-              district: propertyData.district,
-              bedrooms: propertyData.bedrooms,
-              bathrooms: propertyData.bathrooms,
-              area_sqft: propertyData.area_sqft,
-              status: propertyData.status,
-              created_at: createdAt,
-            },
-          ])
-          .select()
-          .single();
-
-        if (!propError && propData) {
-          // Insert images
-          if (uploadedImages.length > 0) {
-            await client.from('property_images').insert(
-              uploadedImages.map((img) => ({
-                id: img.id,
-                property_id: generatedId,
-                image_url: img.image_url,
-                is_primary: img.is_primary,
-              }))
-            );
-          }
-
-          return {
-            ...propData,
-            images: uploadedImages,
-          } as Property;
-        }
-      } catch (err) {
-        console.warn('Supabase createProperty error, fallback to local', err);
-      }
-    }
-
-    // Local save
     const newProperty: Property = {
       ...propertyData,
       id: generatedId,
@@ -498,34 +561,80 @@ export const dbService = {
     const client = getSupabaseClient();
 
     if (client && isSupabaseConfigured()) {
-      try {
-        const payload: Record<string, any> = { ...updates };
-        delete payload.images;
-        delete payload.owner;
+      const payload: Record<string, any> = { ...updates };
+      delete payload.images;
+      delete payload.owner;
 
-        const { data, error } = await client
-          .from('properties')
-          .update(payload)
-          .eq('id', id)
-          .select(`
-            *,
-            property_images (*),
-            owner:profiles (*)
-          `)
-          .single();
+      const { data, error } = await client
+        .from('properties')
+        .update(payload)
+        .eq('id', id)
+        .select(`
+          *,
+          property_images (*),
+          owner:profiles (*)
+        `)
+        .single();
 
-        if (!error && data) {
-          return {
-            ...data,
-            images: data.property_images || [],
-            owner: data.owner,
-          };
-        }
-      } catch (err) {
-        console.warn('Supabase updateProperty failed, falling to local', err);
+      if (error) {
+        console.error('Supabase updateProperty error:', error);
+        throw new Error(`Failed to update property: ${error.message}`);
       }
+
+      let currentImages: PropertyImage[] = data.property_images || [];
+      if (newImages && newImages.length > 0) {
+        for (let i = 0; i < newImages.length; i++) {
+          const item = newImages[i];
+          let url = '';
+          if (typeof item === 'string') {
+            url = item;
+          } else {
+            const fileExt = item.name.split('.').pop()?.toLowerCase() || 'jpg';
+            const fileName = `${id}_${Date.now()}_${i}.${fileExt}`;
+            const { error: uploadErr } = await client.storage
+              .from('property-images')
+              .upload(fileName, item, { cacheControl: '3600', upsert: true });
+
+            if (uploadErr) {
+              console.error('Supabase storage upload error:', uploadErr);
+              throw new Error(`Failed to upload photo "${item.name}": ${uploadErr.message}`);
+            }
+
+            const { data: pubData } = client.storage
+              .from('property-images')
+              .getPublicUrl(fileName);
+            url = pubData.publicUrl;
+          }
+
+          const imgId = generateUUID();
+          const { error: imgErr } = await client.from('property_images').insert({
+            id: imgId,
+            property_id: id,
+            image_url: url,
+            is_primary: currentImages.length === 0 && i === 0,
+            created_at: new Date().toISOString(),
+          });
+          if (imgErr) {
+            console.error('Supabase property_images insert error:', imgErr);
+            throw new Error(`Failed to save image in database: ${imgErr.message}`);
+          }
+          currentImages.push({
+            id: imgId,
+            property_id: id,
+            image_url: url,
+            is_primary: currentImages.length === 0 && i === 0,
+          });
+        }
+      }
+
+      return {
+        ...data,
+        images: currentImages,
+        owner: data.owner,
+      };
     }
 
+    // Local mode ONLY when Supabase is NOT configured
     const localList = getLocalProperties();
     const index = localList.findIndex((p) => p.id === id);
     if (index === -1) return null;
@@ -571,16 +680,18 @@ export const dbService = {
     const client = getSupabaseClient();
 
     if (client && isSupabaseConfigured()) {
-      try {
-        // Delete images first
-        await client.from('property_images').delete().eq('property_id', id);
-        const { error } = await client.from('properties').delete().eq('id', id);
-        if (!error) return true;
-      } catch (err) {
-        console.warn('Supabase delete error:', err);
+      // Delete location and images first
+      await client.from('property_locations').delete().eq('property_id', id);
+      await client.from('property_images').delete().eq('property_id', id);
+      const { error } = await client.from('properties').delete().eq('id', id);
+      if (error) {
+        console.error('Supabase delete error:', error);
+        throw new Error(`Failed to delete property from database: ${error.message}`);
       }
+      return true;
     }
 
+    // Local mode ONLY when Supabase is NOT configured
     const list = getLocalProperties();
     const filtered = list.filter((p) => p.id !== id);
     saveLocalProperties(filtered);
@@ -1437,20 +1548,20 @@ export const dbService = {
 
     const client = getSupabaseClient();
     if (client && isSupabaseConfigured()) {
-      try {
-        const { data, error } = await client
-          .from('property_locations')
-          .select('*')
-          .eq('property_id', propertyId)
-          .single();
-        if (!error && data) {
-          return data as PropertyLocation;
-        }
-      } catch (err) {
-        console.warn('Supabase getPropertyLocation error:', err);
+      const { data, error } = await client
+        .from('property_locations')
+        .select('*')
+        .eq('property_id', propertyId)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('Supabase getPropertyLocation error:', error);
+        return null;
       }
+      return (data as PropertyLocation) || null;
     }
 
+    // Local mode ONLY when Supabase is NOT configured
     const localLocs = getLocalLocations();
     return localLocs.find((loc) => loc.property_id === propertyId) || null;
   },
@@ -1461,21 +1572,22 @@ export const dbService = {
     const result: Record<string, PropertyLocation> = {};
 
     if (client && isSupabaseConfigured()) {
-      try {
-        const { data, error } = await client
-          .from('property_locations')
-          .select('*');
-        if (!error && data) {
-          data.forEach((item: any) => {
-            result[item.property_id] = item as PropertyLocation;
-          });
-          return result;
-        }
-      } catch (err) {
-        console.warn('Supabase getAllPropertyLocations error, fallback to local:', err);
+      const { data, error } = await client
+        .from('property_locations')
+        .select('*');
+
+      if (error) {
+        console.error('Supabase getAllPropertyLocations error:', error);
+        throw new Error(`Failed to load property locations: ${error.message}`);
       }
+
+      (data || []).forEach((item: any) => {
+        result[item.property_id] = item as PropertyLocation;
+      });
+      return result;
     }
 
+    // Local mode ONLY when Supabase is NOT configured
     const localLocs = getLocalLocations();
     localLocs.forEach((loc) => {
       result[loc.property_id] = loc;
@@ -1510,22 +1622,33 @@ export const dbService = {
 
     const client = getSupabaseClient();
     if (client && isSupabaseConfigured()) {
-      try {
-        await client.from('property_locations').upsert({
-          property_id: newLocation.property_id,
-          latitude: newLocation.latitude,
-          longitude: newLocation.longitude,
-          accuracy_meters: newLocation.accuracy_meters,
-          landmark: newLocation.landmark,
-          maps_url: newLocation.maps_url,
-          captured_at: newLocation.captured_at,
-          updated_at: newLocation.updated_at,
-        });
-      } catch (err) {
-        console.warn('Supabase savePropertyLocation error, saving local:', err);
+      const { data: savedData, error } = await client
+        .from('property_locations')
+        .upsert(
+          {
+            property_id: newLocation.property_id,
+            latitude: newLocation.latitude,
+            longitude: newLocation.longitude,
+            accuracy_meters: newLocation.accuracy_meters,
+            landmark: newLocation.landmark,
+            maps_url: newLocation.maps_url,
+            captured_at: newLocation.captured_at,
+            updated_at: newLocation.updated_at,
+          },
+          { onConflict: 'property_id' }
+        )
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Supabase savePropertyLocation error:', error);
+        throw new Error(`Failed to save property location to database: ${error.message}`);
       }
+
+      return (savedData as PropertyLocation) || newLocation;
     }
 
+    // Local mode ONLY when Supabase is NOT configured
     const current = getLocalLocations().filter(
       (l) => l.property_id !== data.property_id
     );
