@@ -1,4 +1,5 @@
 export type UserRole = 'hunter' | 'owner' | 'admin';
+export type { NepalCity } from '../constants/cities';
 
 export type PropertyStatus =
   | 'available'

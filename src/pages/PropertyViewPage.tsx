@@ -23,9 +23,8 @@ import {
   Sparkles,
   AlertCircle,
 } from 'lucide-react';
+import { CITIES_WITH_ALL, DISTRICTS_WITH_ALL } from '../constants/cities';
 
-const CITIES = ['All', 'Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'Chitwan'];
-const DISTRICTS = ['All', 'Kathmandu', 'Lalitpur', 'Bhaktapur', 'Kaski', 'Chitwan'];
 const PROPERTY_TYPES = [
   { value: 'all', label: 'All Types' },
   { value: 'room', label: 'Room (Single/Double)' },
@@ -298,9 +297,9 @@ export const PropertyViewPage: React.FC = () => {
           {/* City Filter Pills */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin w-full sm:w-auto">
             <span className="text-xs font-bold text-slate-700 whitespace-nowrap mr-1">
-              Top Cities:
+              Cities:
             </span>
-            {CITIES.map((city) => (
+            {CITIES_WITH_ALL.map((city) => (
               <button
                 key={city}
                 onClick={() => setFilters((p) => ({ ...p, city }))}
@@ -310,7 +309,7 @@ export const PropertyViewPage: React.FC = () => {
                     : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                 }`}
               >
-                {city === 'All' ? 'All Nepal' : city}
+                {city === 'All' ? 'All Cities' : city}
               </button>
             ))}
           </div>
@@ -396,6 +395,24 @@ export const PropertyViewPage: React.FC = () => {
             </select>
           </div>
 
+          {/* City Filter */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              City
+            </label>
+            <select
+              value={filters.city}
+              onChange={(e) => setFilters((p) => ({ ...p, city: e.target.value }))}
+              className="w-full text-xs font-medium p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            >
+              {CITIES_WITH_ALL.map((c) => (
+                <option key={c} value={c}>
+                  {c === 'All' ? 'All Cities' : c}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* District Filter */}
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
@@ -406,9 +423,9 @@ export const PropertyViewPage: React.FC = () => {
               onChange={(e) => setFilters((p) => ({ ...p, district: e.target.value }))}
               className="w-full text-xs font-medium p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
-              {DISTRICTS.map((dist) => (
+              {DISTRICTS_WITH_ALL.map((dist) => (
                 <option key={dist} value={dist}>
-                  {dist}
+                  {dist === 'All' ? 'All Districts' : dist}
                 </option>
               ))}
             </select>
@@ -509,6 +526,22 @@ export const PropertyViewPage: React.FC = () => {
                 </button>
               </div>
 
+              {/* City */}
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-700 mb-1">City</label>
+                <select
+                  value={filters.city}
+                  onChange={(e) => setFilters((p) => ({ ...p, city: e.target.value }))}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                >
+                  {CITIES_WITH_ALL.map((c) => (
+                    <option key={c} value={c}>
+                      {c === 'All' ? 'All Cities' : c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* District */}
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-700 mb-1">District</label>
@@ -517,8 +550,10 @@ export const PropertyViewPage: React.FC = () => {
                   onChange={(e) => setFilters((p) => ({ ...p, district: e.target.value }))}
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
                 >
-                  {DISTRICTS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
+                  {DISTRICTS_WITH_ALL.map((d) => (
+                    <option key={d} value={d}>
+                      {d === 'All' ? 'All Districts' : d}
+                    </option>
                   ))}
                 </select>
               </div>

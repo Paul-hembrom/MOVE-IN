@@ -127,7 +127,7 @@ export const HunterPlanModal: React.FC<HunterPlanModalProps> = ({
             Unlock Landlord Contacts with Zero Brokerage
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Choose a plan to contact verified flat and room owners directly across Kathmandu, Lalitpur, and Pokhara.
+            Choose a plan to contact verified flat and room owners directly across major cities of Nepal.
           </p>
 
           {/* Current Status banner */}

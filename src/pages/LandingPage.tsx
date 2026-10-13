@@ -3,6 +3,7 @@ import { Property } from '../types';
 import { dbService } from '../lib/dbService';
 import { PropertyCard } from '../components/PropertyCard';
 import { useRouter, Link } from '../context/RouterContext';
+import { NEPAL_CITIES } from '../constants/cities';
 import {
   Search,
   MapPin,
@@ -84,7 +85,7 @@ export const LandingPage: React.FC = () => {
             <span className="text-cyan-400">Home</span> in Nepal
           </h1>
           <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Zero broker fees. Verified listings in Kathmandu, Lalitpur, Bhaktapur, and Pokhara.
+            Zero broker fees. Verified listings across 20 major cities of Nepal.
             Connect directly with verified owners with one click.
           </p>
 
@@ -103,12 +104,12 @@ export const LandingPage: React.FC = () => {
                     onChange={(e) => setSearchLocation(e.target.value)}
                     className="w-full text-xs font-semibold bg-transparent text-slate-800 focus:outline-none cursor-pointer"
                   >
-                    <option value="">All Nepal Cities</option>
-                    <option value="Kathmandu">Kathmandu</option>
-                    <option value="Lalitpur">Lalitpur</option>
-                    <option value="Bhaktapur">Bhaktapur</option>
-                    <option value="Pokhara">Pokhara</option>
-                    <option value="Chitwan">Chitwan</option>
+                    <option value="">All Cities</option>
+                    {NEPAL_CITIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -270,7 +271,7 @@ export const LandingPage: React.FC = () => {
                   <div>
                     <h4 className="text-sm font-bold text-slate-800">Search & Filter Verified Spaces</h4>
                     <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                      Filter by city (Kathmandu, Lalitpur, etc.), budget, room count, and amenities like 24/7 water and parking.
+                      Filter by city (Kathmandu, Pokhara, Bharatpur, etc.), budget, room count, and amenities like 24/7 water and parking.
                     </p>
                   </div>
                 </div>

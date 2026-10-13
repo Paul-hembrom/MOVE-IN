@@ -38,18 +38,23 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/propertyview?city=Lalitpur" className="hover:text-emerald-400 transition-colors">
-                  Flats in Lalitpur
-                </Link>
-              </li>
-              <li>
-                <Link href="/propertyview?city=Bhaktapur" className="hover:text-emerald-400 transition-colors">
-                  Houses in Bhaktapur
-                </Link>
-              </li>
-              <li>
                 <Link href="/propertyview?city=Pokhara" className="hover:text-emerald-400 transition-colors">
-                  Properties in Pokhara
+                  Flats in Pokhara
+                </Link>
+              </li>
+              <li>
+                <Link href="/propertyview?city=Bharatpur" className="hover:text-emerald-400 transition-colors">
+                  Houses in Bharatpur
+                </Link>
+              </li>
+              <li>
+                <Link href="/propertyview?city=Biratnagar" className="hover:text-emerald-400 transition-colors">
+                  Properties in Biratnagar
+                </Link>
+              </li>
+              <li>
+                <Link href="/propertyview?city=Butwal" className="hover:text-emerald-400 transition-colors">
+                  Rentals in Butwal
                 </Link>
               </li>
             </ul>

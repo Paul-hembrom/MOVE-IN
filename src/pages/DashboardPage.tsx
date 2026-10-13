@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Property, PropertyType, ListingType, PropertyStatus, Subscription, PaymentPurpose } from '../types';
 import { dbService } from '../lib/dbService';
 import { reverseGeocodeNominatim, searchAddressNominatim } from '../lib/nominatim';
+import { NEPAL_CITIES, NepalCity, CITY_DISTRICT_MAP, DEFAULT_CITY } from '../constants/cities';
 import { StatusBadge } from '../components/StatusBadge';
 import { PaymentModal } from '../components/PaymentModal';
 import { useToast } from '../context/ToastContext';
@@ -74,8 +75,8 @@ export const DashboardPage: React.FC = () => {
   const [price, setPrice] = useState<number | ''>('');
   const [negotiable, setNegotiable] = useState(true);
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Kathmandu');
-  const [district, setDistrict] = useState('Kathmandu');
+  const [city, setCity] = useState<string>(DEFAULT_CITY);
+  const [district, setDistrict] = useState<string>(CITY_DISTRICT_MAP[DEFAULT_CITY]);
   const [bedrooms, setBedrooms] = useState<number>(2);
   const [bathrooms, setBathrooms] = useState<number>(1);
   const [areaSqft, setAreaSqft] = useState<number>(650);
@@ -137,8 +138,8 @@ export const DashboardPage: React.FC = () => {
     setPrice('');
     setNegotiable(true);
     setAddress('');
-    setCity('Kathmandu');
-    setDistrict('Kathmandu');
+    setCity(DEFAULT_CITY);
+    setDistrict(CITY_DISTRICT_MAP[DEFAULT_CITY]);
     setBedrooms(2);
     setBathrooms(1);
     setAreaSqft(650);
@@ -252,19 +253,19 @@ export const DashboardPage: React.FC = () => {
 
             if (road) setAddress(road);
             if (matchedCity) {
-              const knownCities = ['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'Chitwan', 'Butwal'];
-              const found = knownCities.find((c) =>
-                matchedCity.toLowerCase().includes(c.toLowerCase())
+              const found = NEPAL_CITIES.find(
+                (c) =>
+                  matchedCity.toLowerCase().includes(c.toLowerCase()) ||
+                  c.toLowerCase().includes(matchedCity.toLowerCase())
               );
-              if (found) setCity(found);
-              else setCity(matchedCity);
-            }
-            if (matchedDistrict) {
-              const knownDistricts = ['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Kaski', 'Chitwan'];
-              const found = knownDistricts.find((d) =>
-                matchedDistrict.toLowerCase().includes(d.toLowerCase())
-              );
-              if (found) setDistrict(found);
+              if (found) {
+                setCity(found);
+                if (CITY_DISTRICT_MAP[found]) setDistrict(CITY_DISTRICT_MAP[found]);
+              } else {
+                setCity(matchedCity);
+              }
+            } else if (matchedDistrict) {
+              setDistrict(matchedDistrict);
             }
             showToast('Address details auto-filled from GPS', 'info');
           }
@@ -320,11 +321,13 @@ export const DashboardPage: React.FC = () => {
     setCapturedAccuracy(20);
     const parts = item.display_name.split(',');
     setAddress(parts[0] || item.name || addressSearchQuery);
-    const knownCities = ['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'Chitwan', 'Butwal'];
-    const matched = knownCities.find((c) =>
+    const matched = NEPAL_CITIES.find((c) =>
       item.display_name.toLowerCase().includes(c.toLowerCase())
     );
-    if (matched) setCity(matched);
+    if (matched) {
+      setCity(matched);
+      if (CITY_DISTRICT_MAP[matched]) setDistrict(CITY_DISTRICT_MAP[matched]);
+    }
     setAddressSearchResults([]);
     setGeoError(null);
     showToast(`Coordinates captured for ${parts[0]}`, 'success');
@@ -1139,15 +1142,20 @@ export const DashboardPage: React.FC = () => {
                   </label>
                   <select
                     value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                    onChange={(e) => {
+                      const newCity = e.target.value as NepalCity;
+                      setCity(newCity);
+                      if (CITY_DISTRICT_MAP[newCity]) {
+                        setDistrict(CITY_DISTRICT_MAP[newCity]);
+                      }
+                    }}
+                    className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none cursor-pointer"
                   >
-                    <option value="Kathmandu">Kathmandu</option>
-                    <option value="Lalitpur">Lalitpur</option>
-                    <option value="Bhaktapur">Bhaktapur</option>
-                    <option value="Pokhara">Pokhara</option>
-                    <option value="Chitwan">Chitwan</option>
-                    <option value="Butwal">Butwal</option>
+                    {NEPAL_CITIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -1155,17 +1163,13 @@ export const DashboardPage: React.FC = () => {
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                     District
                   </label>
-                  <select
+                  <input
+                    type="text"
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
+                    placeholder="e.g. Kathmandu, Kaski, Morang"
                     className="w-full text-sm px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
-                  >
-                    <option value="Kathmandu">Kathmandu</option>
-                    <option value="Lalitpur">Lalitpur</option>
-                    <option value="Bhaktapur">Bhaktapur</option>
-                    <option value="Kaski">Kaski (Pokhara)</option>
-                    <option value="Chitwan">Chitwan</option>
-                  </select>
+                  />
                 </div>
               </div>
 
@@ -1436,7 +1440,7 @@ export const DashboardPage: React.FC = () => {
                   setPaymentConfig({
                     isOpen: true,
                     title: 'Super Boost Listing (14 Days)',
-                    subtitle: `Maximum visibility across Kathmandu Valley & Pokhara for "${prop.title}"`,
+                    subtitle: `Maximum visibility across all major cities of Nepal for "${prop.title}"`,
                     amount: 499,
                     purpose: 'boost_listing',
                     propertyId: prop.id,
