@@ -2,6 +2,7 @@ import React from 'react';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
 import { RouterProvider, useRouter } from './context/RouterContext';
+import { CityProvider } from './context/CityContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -79,7 +80,9 @@ export default function App() {
     <ToastProvider>
       <AuthProvider>
         <RouterProvider>
-          <AppContent />
+          <CityProvider>
+            <AppContent />
+          </CityProvider>
         </RouterProvider>
       </AuthProvider>
     </ToastProvider>

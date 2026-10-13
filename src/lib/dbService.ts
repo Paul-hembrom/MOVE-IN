@@ -703,15 +703,15 @@ export const dbService = {
     const client = getSupabaseClient();
 
     if (client && isSupabaseConfigured()) {
-      try {
-        const { error } = await client
-          .from('properties')
-          .update({ status })
-          .eq('id', id);
-        if (!error) return true;
-      } catch (err) {
-        console.warn('Supabase update status error:', err);
+      const { error } = await client
+        .from('properties')
+        .update({ status })
+        .eq('id', id);
+      if (error) {
+        console.error('Supabase update status error:', error);
+        throw new Error(`Failed to update property status: ${error.message}`);
       }
+      return true;
     }
 
     const list = getLocalProperties();

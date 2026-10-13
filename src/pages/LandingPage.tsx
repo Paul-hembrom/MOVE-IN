@@ -3,6 +3,7 @@ import { Property } from '../types';
 import { dbService } from '../lib/dbService';
 import { PropertyCard } from '../components/PropertyCard';
 import { useRouter, Link } from '../context/RouterContext';
+import { useCity } from '../context/CityContext';
 import { NEPAL_CITIES } from '../constants/cities';
 import {
   Search,
@@ -19,13 +20,18 @@ import {
 
 export const LandingPage: React.FC = () => {
   const { navigate } = useRouter();
+  const { selectedCity, selectedCityLabel, setSelectedCity, matchesSelectedCity } = useCity();
   const [featuredProperties, setFeaturedProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Search Bar state
-  const [searchLocation, setSearchLocation] = useState('');
+  // Search Bar state (mirrors global city)
+  const [searchLocation, setSearchLocation] = useState(selectedCity !== 'All' ? selectedCity : '');
   const [propertyType, setPropertyType] = useState('all');
   const [priceRange, setPriceRange] = useState('all');
+
+  useEffect(() => {
+    setSearchLocation(selectedCity !== 'All' ? selectedCity : '');
+  }, [selectedCity]);
 
   useEffect(() => {
     loadFeatured();
@@ -34,7 +40,7 @@ export const LandingPage: React.FC = () => {
   const loadFeatured = async () => {
     setLoading(true);
     try {
-      const data = await dbService.getProperties({ status: 'available', limit: 6 });
+      const data = await dbService.getProperties({ status: 'available' });
       setFeaturedProperties(data);
     } catch (e) {
       console.error(e);
@@ -43,8 +49,18 @@ export const LandingPage: React.FC = () => {
     }
   };
 
+  const displayedFeatured = React.useMemo(() => {
+    return featuredProperties.filter((p) => matchesSelectedCity(p.city));
+  }, [featuredProperties, selectedCity, matchesSelectedCity]);
+
   const handleHeroSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    if (searchLocation) {
+      setSelectedCity(searchLocation);
+    } else {
+      setSelectedCity('All');
+    }
+
     const params = new URLSearchParams();
     if (searchLocation) params.append('city', searchLocation);
     if (propertyType !== 'all') params.append('type', propertyType);
@@ -176,9 +192,10 @@ export const LandingPage: React.FC = () => {
                   key={query}
                   onClick={() => {
                     const city = query.split(' ')[2] || 'Kathmandu';
+                    setSelectedCity(city);
                     navigate(`/propertyview?city=${city}`);
                   }}
-                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white transition-colors"
+                  className="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 text-white transition-colors cursor-pointer"
                 >
                   {query}
                 </button>
@@ -197,18 +214,20 @@ export const LandingPage: React.FC = () => {
               <span>Verified Direct Listings</span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-              Featured Available Properties
+              Featured Available Properties {selectedCity !== 'All' ? `in ${selectedCityLabel}` : ''}
             </h2>
             <p className="text-sm text-slate-500 mt-1">
-              Freshly listed spaces across the valley with real photos and exact pricing
+              {selectedCity !== 'All'
+                ? `Verified flat, room, and home spaces in ${selectedCityLabel}`
+                : 'Freshly listed spaces across Nepal with real photos and exact pricing'}
             </p>
           </div>
 
           <Link
-            href="/propertyview"
+            href={selectedCity !== 'All' ? `/propertyview?city=${encodeURIComponent(selectedCity)}` : '/propertyview'}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 transition-colors w-fit"
           >
-            <span>Explore All Properties</span>
+            <span>{selectedCity !== 'All' ? `Explore All in ${selectedCityLabel}` : 'Explore All Properties'}</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
@@ -222,15 +241,32 @@ export const LandingPage: React.FC = () => {
               />
             ))}
           </div>
-        ) : featuredProperties.length > 0 ? (
+        ) : displayedFeatured.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {featuredProperties.map((property) => (
+            {displayedFeatured.slice(0, 6).map((property) => (
               <PropertyCard key={property.id} property={property} />
             ))}
           </div>
         ) : (
-          <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200">
-            <p className="text-slate-600 font-medium">No available properties found right now.</p>
+          <div className="text-center py-12 bg-slate-50 rounded-3xl border border-slate-200 p-8 max-w-lg mx-auto">
+            <MapPin className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <p className="text-slate-900 font-bold text-base">
+              {selectedCity !== 'All'
+                ? `No available properties found in ${selectedCityLabel} yet.`
+                : 'No available properties found right now.'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1 mb-4">
+              Try switching your location or browsing properties across all cities in Nepal.
+            </p>
+            {selectedCity !== 'All' && (
+              <button
+                type="button"
+                onClick={() => setSelectedCity('All')}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors cursor-pointer"
+              >
+                <span>Show All Nepal Properties</span>
+              </button>
+            )}
           </div>
         )}
       </section>

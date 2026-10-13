@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useRouter, Link } from '../context/RouterContext';
+import { CitySelector } from './CitySelector';
 import {
   Home,
   Compass,
@@ -35,21 +36,24 @@ export const Navbar: React.FC = () => {
       <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 transition-shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20">
-            {/* Brand Logo */}
-            <div className="flex items-center gap-6">
-              <Link href="/" className="flex items-center gap-2.5 group">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
-                  <Home className="w-5 h-5" />
+            {/* Brand Logo & City Selector */}
+            <div className="flex items-center gap-2.5 sm:gap-4">
+              <Link href="/" className="flex items-center gap-2 sm:gap-2.5 group shrink-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+                  <Home className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-xl font-extrabold tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">
+                  <span className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 group-hover:text-emerald-700 transition-colors">
                     Move-<span className="text-emerald-600">In</span>
                   </span>
-                  <span className="text-[10px] text-slate-700 tracking-wider uppercase font-semibold">
+                  <span className="text-[9px] sm:text-[10px] text-slate-700 tracking-wider uppercase font-semibold hidden xs:block">
                     Nepal Real Estate
                   </span>
                 </div>
               </Link>
+
+              {/* Housing.com style Global City Selector */}
+              <CitySelector />
             </div>
 
             {/* Desktop Navigation Links */}
