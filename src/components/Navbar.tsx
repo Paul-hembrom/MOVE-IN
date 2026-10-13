@@ -12,15 +12,12 @@ import {
   Menu,
   X,
   PlusCircle,
-  Database,
 } from 'lucide-react';
-import { SupabaseConfigModal } from './SupabaseConfigModal';
 
 export const Navbar: React.FC = () => {
-  const { user, logout, isLiveSupabase } = useAuth();
+  const { user, logout } = useAuth();
   const { path } = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [configModalOpen, setConfigModalOpen] = useState(false);
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -53,25 +50,6 @@ export const Navbar: React.FC = () => {
                   </span>
                 </div>
               </Link>
-
-              {/* Supabase status indicator button */}
-              <button
-                onClick={() => setConfigModalOpen(true)}
-                title="Configure Supabase connection"
-                className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-                  isLiveSupabase
-                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
-                    : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'
-                }`}
-              >
-                <Database className="w-3.5 h-3.5 text-emerald-700" />
-                <span>{isLiveSupabase ? 'Supabase Live' : 'Supabase Config'}</span>
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    isLiveSupabase ? 'bg-emerald-600 animate-pulse' : 'bg-slate-500'
-                  }`}
-                />
-              </button>
             </div>
 
             {/* Desktop Navigation Links */}
@@ -202,14 +180,6 @@ export const Navbar: React.FC = () => {
             {/* Mobile menu button */}
             <div className="flex items-center gap-2 lg:hidden">
               <button
-                onClick={() => setConfigModalOpen(true)}
-                className="p-2 text-slate-600 hover:text-emerald-600 rounded-lg"
-                title="Supabase Config"
-              >
-                <Database className="w-5 h-5" />
-              </button>
-
-              <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="p-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                 aria-label="Toggle navigation menu"
@@ -318,14 +288,6 @@ export const Navbar: React.FC = () => {
         )}
       </header>
 
-      {/* Supabase modal */}
-      <SupabaseConfigModal
-        isOpen={configModalOpen}
-        onClose={() => setConfigModalOpen(false)}
-        onConfigChanged={() => {
-          // Trigger refresh
-        }}
-      />
     </>
   );
 };
