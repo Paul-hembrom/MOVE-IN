@@ -298,10 +298,46 @@ export const dbService = {
         query = query.limit(options.limit);
       }
 
-      const { data, error } = await query;
+      let data: any[] | null = null;
+      let error: any = null;
+
+      // Attempt 1: Full select with property_images and owner:profiles join
+      const res1 = await query;
+      data = res1.data;
+      error = res1.error;
+
+      // If joined query failed (e.g. profiles RLS policy blocks or FK embed issue), retry without owner embed
       if (error) {
-        console.error('Supabase getProperties returned error:', error);
-        throw new Error(`Failed to load properties from database: ${error.message}`);
+        console.warn('Supabase getProperties with owner:profiles failed, retrying without owner embed:', error);
+        let fallbackQuery = client
+          .from('properties')
+          .select(`
+            *,
+            property_images (*)
+          `)
+          .order('is_featured', { ascending: false })
+          .order('created_at', { ascending: false });
+
+        if (options?.status && options.status !== 'all') {
+          fallbackQuery = fallbackQuery.eq('status', options.status);
+        } else if (!options?.status) {
+          fallbackQuery = fallbackQuery.eq('status', 'available');
+        }
+
+        if (options?.ownerId) {
+          fallbackQuery = fallbackQuery.eq('owner_id', options.ownerId);
+        }
+
+        if (options?.limit) {
+          fallbackQuery = fallbackQuery.limit(options.limit);
+        }
+
+        const res2 = await fallbackQuery;
+        if (res2.error) {
+          console.error('Supabase getProperties fallback error:', res2.error);
+          throw new Error(`Failed to load properties from database: ${res2.error.message}`);
+        }
+        data = res2.data;
       }
 
       // If Supabase is configured and query succeeded, ALWAYS return data (even if empty array)
@@ -352,7 +388,7 @@ export const dbService = {
     const client = getSupabaseClient();
 
     if (client && isSupabaseConfigured()) {
-      const { data, error } = await client
+      let { data, error } = await client
         .from('properties')
         .select(`
           *,
@@ -363,8 +399,21 @@ export const dbService = {
         .maybeSingle();
 
       if (error) {
-        console.error('Supabase getPropertyById error:', error);
-        throw new Error(`Failed to fetch property details: ${error.message}`);
+        console.warn('Supabase getPropertyById join failed, retrying without owner embed:', error);
+        const fallbackRes = await client
+          .from('properties')
+          .select(`
+            *,
+            property_images (*)
+          `)
+          .eq('id', id)
+          .maybeSingle();
+
+        if (fallbackRes.error) {
+          console.error('Supabase getPropertyById error:', fallbackRes.error);
+          throw new Error(`Failed to fetch property details: ${fallbackRes.error.message}`);
+        }
+        data = fallbackRes.data;
       }
 
       if (!data) return null;
@@ -430,8 +479,13 @@ export const dbService = {
             });
 
           if (uploadError) {
-            console.error('Supabase storage upload error:', uploadError);
-            throw new Error(`Failed to upload photo "${item.name}": ${uploadError.message}`);
+            console.error('Supabase storage upload error details:', {
+              message: uploadError.message,
+              name: uploadError.name,
+              statusCode: (uploadError as any).statusCode || (uploadError as any).status,
+              error: uploadError,
+            });
+            throw new Error(`Failed to upload photo "${item.name}": ${uploadError.message}. Storage RLS policy violation: Please ensure INSERT policy is configured for the 'property-images' bucket in Supabase.`);
           }
 
           const { data: publicUrlData } = client.storage
@@ -596,8 +650,13 @@ export const dbService = {
               .upload(fileName, item, { cacheControl: '3600', upsert: true });
 
             if (uploadErr) {
-              console.error('Supabase storage upload error:', uploadErr);
-              throw new Error(`Failed to upload photo "${item.name}": ${uploadErr.message}`);
+              console.error('Supabase storage upload error details:', {
+                message: uploadErr.message,
+                name: uploadErr.name,
+                statusCode: (uploadErr as any).statusCode || (uploadErr as any).status,
+                error: uploadErr,
+              });
+              throw new Error(`Failed to upload photo "${item.name}": ${uploadErr.message}. Storage RLS policy violation: Please ensure INSERT policy is configured for the 'property-images' bucket in Supabase.`);
             }
 
             const { data: pubData } = client.storage

@@ -112,15 +112,27 @@ export const DashboardPage: React.FC = () => {
     if (!user) return;
     setLoading(true);
     try {
-      // If user is owner, fetch their properties
-      const [data, sub, unlockCount] = await Promise.all([
+      // If user is owner, fetch their properties and subscription
+      const [dataRes, subRes, unlockRes] = await Promise.allSettled([
         dbService.getProperties({ status: 'all', ownerId: user.id }),
         dbService.getUserSubscription(user.id),
         dbService.getOwnerContactsUnlockedCount(user.id),
       ]);
-      setProperties(data);
-      setSubscription(sub);
-      setContactsUnlockedCount(unlockCount);
+
+      if (dataRes.status === 'fulfilled') {
+        setProperties(dataRes.value);
+      } else {
+        console.error('Failed to load owner properties:', dataRes.reason);
+        showToast('Error loading your properties', 'error');
+      }
+
+      if (subRes.status === 'fulfilled') {
+        setSubscription(subRes.value);
+      }
+
+      if (unlockRes.status === 'fulfilled') {
+        setContactsUnlockedCount(unlockRes.value);
+      }
     } catch (err) {
       console.error(err);
       showToast('Error loading your properties', 'error');
