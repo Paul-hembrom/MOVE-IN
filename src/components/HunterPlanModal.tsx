@@ -45,64 +45,47 @@ export const HunterPlanModal: React.FC<HunterPlanModalProps> = ({
   }> = [
     {
       tier: 'free',
-      name: 'Free Starter',
+      name: 'Free',
       price: 0,
       duration: 'Lifetime',
       contacts: 2,
       features: [
-        '2 Owner phone unlocks',
-        'In-app chat with landlords',
-        'Standard search & map',
-        'Direct landlord messaging',
+        'Browse listings',
+        '2 free contacts',
+        'In-app chat',
       ],
       icon: Zap,
     },
     {
       tier: 'basic',
-      name: 'Basic Hunter',
-      price: 199,
+      name: 'Basic',
+      price: 499,
       duration: '60 Days',
       contacts: 10,
+      popular: true,
+      badge: 'Most Popular',
       features: [
-        '10 Owner phone unlocks',
-        'In-app chat with landlords',
-        'Valid for 60 full days',
-        'Save Rs 800 vs single unlock',
+        '10 contacts',
+        'In-app chat',
+        'Standard support',
+        'Verified landlord reveals',
       ],
       icon: Sparkles,
     },
     {
       tier: 'premium',
-      name: 'Premium Seeker',
-      price: 499,
-      duration: '60 Days',
-      contacts: 25,
-      popular: true,
-      badge: 'Best Value',
-      features: [
-        '25 Owner phone unlocks',
-        'Priority tenant inquiries',
-        'In-app chat + WhatsApp reveals',
-        'Priority dispute support',
-        'Valid for 60 full days',
-      ],
-      icon: Crown,
-    },
-    {
-      tier: 'assisted',
-      name: 'Assisted Search',
+      name: 'Premium',
       price: 999,
       duration: '60 Days',
       contacts: 999999,
-      badge: 'VIP White Glove',
+      badge: 'Unlimited Access',
       features: [
-        'Unlimited Owner unlocks',
-        'Dedicated WhatsApp concierge',
-        'Curated shortlist sent daily',
-        'Negotiation assistance',
-        'VIP priority access to new listings',
+        'Unlimited contacts',
+        'Priority support',
+        'Priority inquiries',
+        'Instant owner unlocks',
       ],
-      icon: Headphones,
+      icon: Crown,
     },
   ];
 
@@ -143,7 +126,7 @@ export const HunterPlanModal: React.FC<HunterPlanModalProps> = ({
         </div>
 
         {/* Plans Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
           {PLANS.map((plan) => {
             const Icon = plan.icon;
             const isCurrent = currentTier === plan.tier;

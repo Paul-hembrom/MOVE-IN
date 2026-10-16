@@ -286,7 +286,7 @@ export const PropertyViewPage: React.FC = () => {
               <span>
                 {(hunterSub?.contacts_limit || 2) - (hunterSub?.contacts_used || 0) > 0
                   ? 'Upgrade Plan'
-                  : 'Get Contacts (from Rs 199)'}
+                  : 'Get Contacts (from Rs 499)'}
               </span>
             </button>
           </div>

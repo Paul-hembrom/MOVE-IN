@@ -1365,102 +1365,38 @@ export const DashboardPage: React.FC = () => {
             </p>
 
             <div className="space-y-3 mb-6">
-              {/* Option 1: Basic Boost Rs 199 */}
+              {/* Boost / Featured listing Rs 449 for 7–10 days */}
               <div
                 onClick={() => {
                   const prop = boostModalProperty;
                   setBoostModalProperty(null);
                   setPaymentConfig({
                     isOpen: true,
-                    title: 'Basic Boost Listing (3 Days)',
-                    subtitle: `Feature "${prop.title}" at the top of search for 3 days`,
-                    amount: 199,
+                    title: 'Boost / Featured Listing (7–10 Days)',
+                    subtitle: `Spotlight "${prop.title}" at the top of search & home page for 7–10 days`,
+                    amount: 449,
                     purpose: 'boost_listing',
                     propertyId: prop.id,
-                    metadata: { plan: 'Basic Boost', days: 3 },
+                    metadata: { plan: 'Featured Boost', days: 10 },
                   });
                 }}
-                className="p-4 rounded-2xl border-2 border-slate-200 hover:border-amber-400 hover:bg-amber-50/30 transition-all cursor-pointer flex items-center justify-between group"
+                className="p-5 rounded-2xl border-2 border-amber-400 bg-amber-50/50 hover:bg-amber-100/60 transition-all cursor-pointer flex items-center justify-between relative shadow-sm"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-amber-100 text-slate-700 group-hover:text-amber-700 flex items-center justify-center font-bold">
-                    🚀
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900">Basic Boost (3 Days)</h4>
-                    <p className="text-xs text-slate-500">2x search impressions • Gold badge</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-base font-extrabold text-slate-900">रू 199</span>
-                  <span className="block text-[10px] text-emerald-600 font-semibold">Select →</span>
-                </div>
-              </div>
-
-              {/* Option 2: Pro Boost Rs 299 */}
-              <div
-                onClick={() => {
-                  const prop = boostModalProperty;
-                  setBoostModalProperty(null);
-                  setPaymentConfig({
-                    isOpen: true,
-                    title: 'Pro Boost Listing (7 Days)',
-                    subtitle: `Top priority placement for "${prop.title}" for 1 week`,
-                    amount: 299,
-                    purpose: 'boost_listing',
-                    propertyId: prop.id,
-                    metadata: { plan: 'Pro Boost', days: 7 },
-                  });
-                }}
-                className="p-4 rounded-2xl border-2 border-amber-400 bg-amber-50/40 hover:bg-amber-50 transition-all cursor-pointer flex items-center justify-between relative shadow-xs"
-              >
-                <span className="absolute -top-2.5 right-4 bg-amber-500 text-slate-950 font-black text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">
-                  Most Popular
+                <span className="absolute -top-2.5 right-4 bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Recommended Boost
                 </span>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-bold">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center font-black text-xl shadow-xs">
                     ⭐
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-slate-900">Pro Boost (7 Days)</h4>
-                    <p className="text-xs text-slate-500">5x search impressions • Priority sorting</p>
+                    <h4 className="font-extrabold text-sm text-slate-900">Featured Listing (7–10 Days)</h4>
+                    <p className="text-xs text-slate-600">Top placement • Exclusive gold badge • Up to 5x tenant calls</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <span className="text-base font-extrabold text-amber-700">रू 299</span>
-                  <span className="block text-[10px] text-amber-800 font-bold">Select →</span>
-                </div>
-              </div>
-
-              {/* Option 3: Super Boost Rs 499 */}
-              <div
-                onClick={() => {
-                  const prop = boostModalProperty;
-                  setBoostModalProperty(null);
-                  setPaymentConfig({
-                    isOpen: true,
-                    title: 'Super Boost Listing (14 Days)',
-                    subtitle: `Maximum visibility across all major cities of Nepal for "${prop.title}"`,
-                    amount: 499,
-                    purpose: 'boost_listing',
-                    propertyId: prop.id,
-                    metadata: { plan: 'Super Boost', days: 14 },
-                  });
-                }}
-                className="p-4 rounded-2xl border-2 border-slate-200 hover:border-amber-400 hover:bg-amber-50/30 transition-all cursor-pointer flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-amber-100 text-slate-700 group-hover:text-amber-700 flex items-center justify-center font-bold">
-                    👑
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900">Super Boost (14 Days)</h4>
-                    <p className="text-xs text-slate-500">10x visibility • Homepage spotlight</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-base font-extrabold text-slate-900">रू 499</span>
-                  <span className="block text-[10px] text-emerald-600 font-semibold">Select →</span>
+                  <span className="text-xl font-black text-amber-700">रू 449</span>
+                  <span className="block text-[11px] text-amber-900 font-bold">Select →</span>
                 </div>
               </div>
             </div>
@@ -1583,71 +1519,46 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             <div className="space-y-3 mb-6">
-              {/* Starter Plan */}
+              {/* Starter Plan - Free */}
               <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-between">
                 <div>
                   <h4 className="font-bold text-sm text-slate-900">Starter Plan</h4>
-                  <p className="text-xs text-slate-500">Up to 3 listings • Standard search</p>
+                  <p className="text-xs text-slate-500">List property for free • Standard visibility</p>
                 </div>
-                <span className="text-xs font-bold text-slate-600">Free / Standard</span>
+                <span className="text-xs font-bold text-slate-600 bg-slate-200/60 px-2.5 py-1 rounded-full">Free</span>
               </div>
 
-              {/* Pro Landlord Plan */}
+              {/* Owner Pro Plan */}
               <div
                 onClick={() => {
                   setRenewPlanModalOpen(false);
                   setPaymentConfig({
                     isOpen: true,
-                    title: 'Pro Landlord Membership (Monthly)',
-                    subtitle: 'Unlimited properties, verified host badge, and priority inquiries',
-                    amount: 999,
+                    title: 'Owner Pro Membership (Monthly)',
+                    subtitle: 'More leads visibility, verified badge, and boost credits',
+                    amount: 1299,
                     purpose: 'owner_subscription',
-                    metadata: { plan_name: 'Pro Landlord' },
+                    metadata: { plan_name: 'Owner Pro' },
                   });
                 }}
                 className="p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50 transition-all cursor-pointer flex items-center justify-between"
               >
                 <div>
                   <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-200/80 px-2 py-0.5 rounded-full">
-                    Recommended
+                    Recommended Plan
                   </span>
-                  <h4 className="font-bold text-sm text-slate-900 mt-1">Pro Landlord (1 Month)</h4>
-                  <p className="text-xs text-slate-500">Unlimited listings • 1 free monthly boost</p>
+                  <h4 className="font-bold text-sm text-slate-900 mt-1">Owner Pro (1 Month)</h4>
+                  <p className="text-xs text-slate-500">More leads visibility • Verified badge • Boost credits</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-base font-extrabold text-emerald-800">रू 999/mo</span>
+                  <span className="text-base font-extrabold text-emerald-800">रू 1,299/mo</span>
                   <span className="block text-[10px] text-emerald-600 font-bold">Select →</span>
                 </div>
-              </div>
-
-              {/* Agency Elite */}
-              <div
-                onClick={() => {
-                  setRenewPlanModalOpen(false);
-                  setPaymentConfig({
-                    isOpen: true,
-                    title: 'Agency Elite Membership (Monthly)',
-                    subtitle: 'Complete real estate agency suite with dedicated assistance',
-                    amount: 2499,
-                    purpose: 'owner_subscription',
-                    metadata: { plan_name: 'Agency Elite' },
-                  });
-                }}
-                className="p-4 rounded-2xl border-2 border-slate-200 hover:border-purple-400 hover:bg-purple-50/30 transition-all cursor-pointer flex items-center justify-between"
-              >
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900">Agency Elite (1 Month)</h4>
-                  <p className="text-xs text-slate-500">Multi-agent login • Dedicated account manager</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-base font-extrabold text-slate-900">रू 2,499/mo</span>
-                  <span className="block text-[10px] text-purple-600 font-bold">Select →</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
+    )}
 
       {/* DYNAMIC PAYMENT MODAL FOR DASHBOARD */}
       <PaymentModal

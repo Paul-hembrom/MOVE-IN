@@ -35,7 +35,9 @@ export const RegisterPage: React.FC = () => {
       const res = await register(email, password, fullName, role, phone);
       if (res.success) {
         // Redirect based on role
-        if (role === 'owner') {
+        if (email.trim().toLowerCase() === 'alphanexora38@gmail.com' || (role as string) === 'admin') {
+          navigate('/admin');
+        } else if (role === 'owner') {
           navigate('/dashboard');
         } else {
           navigate('/propertyview');

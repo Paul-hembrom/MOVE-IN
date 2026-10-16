@@ -595,7 +595,7 @@ export const PropertyDetailPage: React.FC = () => {
                             onClick={() => setHunterPlanModalOpen(true)}
                             className="py-2 px-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-[11px] font-bold rounded-xl text-center transition-colors cursor-pointer"
                           >
-                            Plans from Rs 199
+                            Plans from Rs 499
                           </button>
                           <button
                             onClick={() => {

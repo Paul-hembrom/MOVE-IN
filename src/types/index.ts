@@ -94,6 +94,8 @@ export interface Payment {
   purpose: PaymentPurpose;
   method: PaymentMethod;
   transaction_ref: string;
+  screenshot_url?: string;
+  note?: string;
   status: PaymentStatus;
   created_at: string;
   verified_at?: string;

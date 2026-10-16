@@ -836,18 +836,59 @@ export const dbService = {
     }));
   },
 
-  // Create payment record (status='pending')
+  // Create payment record (status='pending') with screenshot upload
   async createPayment(
-    paymentData: Omit<Payment, 'id' | 'created_at' | 'status'>
+    paymentData: Omit<Payment, 'id' | 'created_at' | 'status'>,
+    screenshotFileOrUrl?: File | string
   ): Promise<Payment> {
+    const paymentId = 'pay-' + Date.now();
+    let screenshotUrl = paymentData.screenshot_url || '';
+
+    const client = getSupabaseClient();
+
+    // If a screenshot File or Data URL is supplied
+    if (screenshotFileOrUrl) {
+      if (typeof screenshotFileOrUrl === 'string') {
+        screenshotUrl = screenshotFileOrUrl;
+      } else if (client && isSupabaseConfigured()) {
+        try {
+          const fileExt = screenshotFileOrUrl.name.split('.').pop()?.toLowerCase() || 'jpg';
+          const fileName = `payment_${paymentId}_${Date.now()}.${fileExt}`;
+          const { error: uploadErr } = await client.storage
+            .from('payment-proofs')
+            .upload(fileName, screenshotFileOrUrl, { upsert: true });
+
+          if (!uploadErr) {
+            const { data: pubData } = client.storage
+              .from('payment-proofs')
+              .getPublicUrl(fileName);
+            screenshotUrl = pubData.publicUrl;
+          } else {
+            console.warn('Storage upload error for payment proof, falling back to data URL:', uploadErr);
+          }
+        } catch (e) {
+          console.warn('Supabase storage exception for payment proof:', e);
+        }
+      }
+
+      // If storage URL was not generated, read as Data URL fallback
+      if (!screenshotUrl && typeof screenshotFileOrUrl !== 'string') {
+        screenshotUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve((reader.result as string) || '');
+          reader.readAsDataURL(screenshotFileOrUrl);
+        });
+      }
+    }
+
     const newPayment: Payment = {
       ...paymentData,
-      id: 'pay-' + Date.now(),
+      id: paymentId,
+      screenshot_url: screenshotUrl,
       status: 'pending',
       created_at: new Date().toISOString(),
     };
 
-    const client = getSupabaseClient();
     if (client && isSupabaseConfigured()) {
       try {
         const { data, error } = await client.from('payments').insert([newPayment]).select().single();
@@ -902,12 +943,12 @@ export const dbService = {
       };
       saveLocalUnlocks([newUnlock, ...unlocks]);
     } else if (payment.purpose === 'boost_listing' && payment.property_id) {
-      // Mark property as featured
+      // Mark property as featured (boosted for 7-10 days)
       await this.togglePropertyFeatured(payment.property_id, true);
     } else if (payment.purpose === 'owner_subscription') {
-      // Activate or renew subscription
+      // Activate or renew owner subscription (Owner Pro)
       const subs = getLocalSubscriptions();
-      const planName = payment.metadata?.plan_name || 'Pro Landlord';
+      const planName = payment.metadata?.plan_title || payment.metadata?.plan_name || 'Owner Pro';
       const existingSub = subs.find((s) => s.user_id === payment.user_id);
       if (existingSub) {
         existingSub.status = 'active';
@@ -929,8 +970,10 @@ export const dbService = {
         saveLocalSubscriptions([newSub, ...subs]);
       }
     } else if (payment.purpose === 'hunter_subscription') {
-      // Activate Hunter Subscription Plan
-      const planTier = (payment.metadata?.plan_tier as HunterPlanTier) || 'basic';
+      // Activate Hunter Subscription Plan (Free / Basic Rs 499 [10 contacts] / Premium Rs 999 [unlimited 999999])
+      const planTier: HunterPlanTier =
+        (payment.metadata?.plan_tier as HunterPlanTier) ||
+        (payment.amount >= 999 ? 'premium' : 'basic');
       await this.upgradeHunterPlan(payment.user_id, planTier, payment.id);
     }
 
@@ -1003,6 +1046,11 @@ export const dbService = {
       expires_at: new Date(Date.now() + 365 * 86400000).toISOString(),
       created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
     };
+  },
+
+  // Get all owner subscriptions
+  async getAllSubscriptions(): Promise<Subscription[]> {
+    return getLocalSubscriptions();
   },
 
   // Get count of contacts unlocked for owner's properties
@@ -1215,23 +1263,21 @@ export const dbService = {
     const now = new Date().toISOString();
     const expiresAt = new Date(Date.now() + 60 * 86400000).toISOString();
 
-    let name = 'Basic Plan';
+    let name = 'Basic';
     let limit = 10;
-    let price = 199;
+    let price = 499;
     let prioritySupport = false;
     let whatsappAssisted = false;
 
     if (planTier === 'premium') {
-      name = 'Premium Plan';
-      limit = 25;
-      price = 499;
-      prioritySupport = true;
-    } else if (planTier === 'assisted') {
-      name = 'Assisted Plan';
+      name = 'Premium';
       limit = 999999;
       price = 999;
       prioritySupport = true;
-      whatsappAssisted = true;
+    } else if (planTier === 'free') {
+      name = 'Free';
+      limit = 2;
+      price = 0;
     }
 
     const updatedSub: HunterSubscription = {

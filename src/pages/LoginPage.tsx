@@ -31,10 +31,10 @@ export const LoginPage: React.FC = () => {
     try {
       const res = await login(email, password);
       if (res.success) {
-        // Find role from current user state or guess
-        if (email.includes('admin')) {
+        const cleanEmail = email.trim().toLowerCase();
+        if (cleanEmail === 'alphanexora38@gmail.com' || cleanEmail.includes('admin')) {
           redirectByRole('admin');
-        } else if (email.includes('owner') || email.includes('ramesh') || email.includes('sita')) {
+        } else if (cleanEmail.includes('owner') || cleanEmail.includes('ramesh') || cleanEmail.includes('sita')) {
           redirectByRole('owner');
         } else {
           redirectByRole('hunter');

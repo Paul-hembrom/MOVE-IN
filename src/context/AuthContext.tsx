@@ -25,6 +25,13 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const CURRENT_USER_STORAGE = 'movein_auth_user';
 
+export const SUPERADMIN_EMAIL = 'alphanexora38@gmail.com';
+
+export const isSuperAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  return email.trim().toLowerCase() === SUPERADMIN_EMAIL.toLowerCase();
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +41,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     checkCurrentSession();
   }, []);
+
+  const enforceSuperAdminRole = (profile: Profile): Profile => {
+    if (isSuperAdminEmail(profile.email)) {
+      return {
+        ...profile,
+        role: 'admin',
+      };
+    }
+    return profile;
+  };
 
   const checkCurrentSession = async () => {
     setLoading(true);
@@ -53,7 +70,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .single();
 
           if (profile) {
-            setUser(profile as Profile);
+            const adjusted = enforceSuperAdminRole(profile as Profile);
+            setUser(adjusted);
             setLoading(false);
             return;
           }
@@ -67,7 +85,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const stored = localStorage.getItem(CURRENT_USER_STORAGE);
       if (stored) {
-        setUser(JSON.parse(stored));
+        const parsed = JSON.parse(stored);
+        const adjusted = enforceSuperAdminRole(parsed);
+        setUser(adjusted);
       } else {
         // Default to null or guest
         setUser(null);
@@ -100,9 +120,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             .single();
 
           if (profile && !profileErr) {
-            setUser(profile as Profile);
-            localStorage.setItem(CURRENT_USER_STORAGE, JSON.stringify(profile));
-            showToast(`Welcome back, ${profile.full_name}!`, 'success');
+            const adjusted = enforceSuperAdminRole(profile as Profile);
+            setUser(adjusted);
+            localStorage.setItem(CURRENT_USER_STORAGE, JSON.stringify(adjusted));
+            showToast(`Welcome back, ${adjusted.full_name}!`, 'success');
             return { success: true };
           }
         }
@@ -122,18 +143,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     if (matched) {
-      setUser(matched);
-      localStorage.setItem(CURRENT_USER_STORAGE, JSON.stringify(matched));
-      showToast(`Logged in as ${matched.full_name} (${matched.role})`, 'success');
+      const adjusted = enforceSuperAdminRole(matched);
+      setUser(adjusted);
+      localStorage.setItem(CURRENT_USER_STORAGE, JSON.stringify(adjusted));
+      showToast(`Logged in as ${adjusted.full_name} (${adjusted.role})`, 'success');
       return { success: true };
     }
 
-    // Create an ad-hoc hunter session if unknown
+    // Create an ad-hoc session if unknown (admin if superadmin email)
+    const assignedRole: UserRole = isSuperAdminEmail(email) ? 'admin' : 'hunter';
     const newDemoUser: Profile = {
       id: 'usr-' + Date.now(),
       email: email.trim(),
       full_name: email.split('@')[0] || 'User',
-      role: 'hunter',
+      role: assignedRole,
       created_at: new Date().toISOString(),
     };
     setUser(newDemoUser);
@@ -149,6 +172,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     role: UserRole,
     phone?: string
   ) => {
+    const effectiveRole: UserRole = isSuperAdminEmail(email) ? 'admin' : role;
     const client = getSupabaseClient();
 
     if (isSupabaseConfigured() && client) {
@@ -157,7 +181,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           email,
           password,
           options: {
-            data: { full_name: fullName, role, phone },
+            data: { full_name: fullName, role: effectiveRole, phone },
           },
         });
 
@@ -170,7 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             id: data.user.id,
             email,
             full_name: fullName,
-            role,
+            role: effectiveRole,
             phone,
             created_at: new Date().toISOString(),
           };
@@ -192,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       id: 'usr-' + Date.now(),
       email: email.trim(),
       full_name: fullName.trim(),
-      role,
+      role: effectiveRole,
       phone: phone?.trim(),
       created_at: new Date().toISOString(),
     };

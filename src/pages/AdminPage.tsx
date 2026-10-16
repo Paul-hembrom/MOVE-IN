@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Property, Profile, PropertyStatus, UserRole, Payment, PaymentStatus, PaymentPurpose, PropertyLocation } from '../types';
+import { Property, Profile, PropertyStatus, UserRole, Payment, PaymentStatus, PaymentPurpose, PropertyLocation, HunterPlanTier } from '../types';
 import { dbService } from '../lib/dbService';
 import { StatusBadge } from '../components/StatusBadge';
 import { useToast } from '../context/ToastContext';
@@ -27,6 +27,9 @@ import {
   Wallet,
   Clock,
   Award,
+  Eye,
+  Image as ImageIcon,
+  Crown,
 } from 'lucide-react';
 import { Link } from '../context/RouterContext';
 
@@ -56,6 +59,10 @@ export const AdminPage: React.FC = () => {
   // User Filters
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState<string>('');
+  const [userPendingOnly, setUserPendingOnly] = useState<boolean>(false);
+  const [hunterSubscriptions, setHunterSubscriptions] = useState<Record<string, any>>({});
+  const [ownerSubscriptions, setOwnerSubscriptions] = useState<Record<string, any>>({});
+  const [selectedScreenshotModal, setSelectedScreenshotModal] = useState<Payment | null>(null);
 
   useEffect(() => {
     loadAdminData();
@@ -64,18 +71,32 @@ export const AdminPage: React.FC = () => {
   const loadAdminData = async () => {
     setLoading(true);
     try {
-      const [allProps, allUsers, allPayments, feeReport, allLocations] = await Promise.all([
+      const [allProps, allUsers, allPayments, feeReport, allLocations, allHunterSubs, allOwnerSubs] = await Promise.all([
         dbService.getProperties({ status: 'all' }),
         dbService.getAllProfiles(),
         dbService.getPayments(),
         dbService.getSuccessFeeReport(),
         dbService.getAllPropertyLocations(),
+        dbService.getAllHunterSubscriptions(),
+        dbService.getAllSubscriptions(),
       ]);
       setProperties(allProps);
       setProfiles(allUsers);
       setPayments(allPayments);
       setSuccessFees(feeReport);
       setPropertyLocations(allLocations);
+
+      const hunterMap: Record<string, any> = {};
+      allHunterSubs.forEach((sub) => {
+        hunterMap[sub.user_id] = sub;
+      });
+      setHunterSubscriptions(hunterMap);
+
+      const ownerMap: Record<string, any> = {};
+      allOwnerSubs.forEach((sub) => {
+        ownerMap[sub.user_id] = sub;
+      });
+      setOwnerSubscriptions(ownerMap);
     } catch (err) {
       console.error(err);
       showToast('Error loading administrative data', 'error');
@@ -234,10 +255,11 @@ export const AdminPage: React.FC = () => {
     if (paymentPurposeFilter !== 'all' && pay.purpose !== paymentPurposeFilter) return false;
     if (paymentSearch.trim()) {
       const q = paymentSearch.toLowerCase();
-      const matchRef = pay.transaction_ref.toLowerCase().includes(q);
+      const matchRef = pay.transaction_ref?.toLowerCase().includes(q);
       const matchUser = pay.user?.full_name?.toLowerCase().includes(q) || pay.user?.email?.toLowerCase().includes(q);
       const matchProp = pay.property?.title?.toLowerCase().includes(q);
-      if (!matchRef && !matchUser && !matchProp) return false;
+      const matchNote = pay.note?.toLowerCase().includes(q);
+      if (!matchRef && !matchUser && !matchProp && !matchNote) return false;
     }
     return true;
   });
@@ -249,7 +271,12 @@ export const AdminPage: React.FC = () => {
       const q = userSearch.toLowerCase();
       const matchName = prof.full_name?.toLowerCase().includes(q);
       const matchEmail = prof.email?.toLowerCase().includes(q);
-      if (!matchName && !matchEmail) return false;
+      const matchPhone = prof.phone?.toLowerCase().includes(q);
+      if (!matchName && !matchEmail && !matchPhone) return false;
+    }
+    if (userPendingOnly) {
+      const hasPending = payments.some((p) => p.user_id === prof.id && p.status === 'pending');
+      if (!hasPending) return false;
     }
     return true;
   });
@@ -258,6 +285,8 @@ export const AdminPage: React.FC = () => {
     switch (purpose) {
       case 'contact_unlock':
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'hunter_subscription':
+        return 'bg-teal-100 text-teal-800 border-teal-200';
       case 'boost_listing':
         return 'bg-amber-100 text-amber-800 border-amber-200';
       case 'owner_subscription':
@@ -267,14 +296,20 @@ export const AdminPage: React.FC = () => {
     }
   };
 
-  const getPurposeLabel = (purpose: PaymentPurpose) => {
-    switch (purpose) {
+  const getPurposeLabel = (pay: Payment) => {
+    switch (pay.purpose) {
       case 'contact_unlock':
         return 'Contact Unlock (Rs 99)';
+      case 'hunter_subscription': {
+        const tier = pay.metadata?.plan_tier;
+        if (tier === 'premium' || pay.amount >= 999) return 'Hunter Premium (Unlimited)';
+        if (tier === 'basic' || pay.amount >= 499) return 'Hunter Basic (10 Contacts)';
+        return 'Hunter Membership';
+      }
       case 'boost_listing':
-        return 'Boost Listing';
+        return 'Boost Listing (Rs 449)';
       case 'owner_subscription':
-        return 'Owner Subscription';
+        return pay.metadata?.plan_title || 'Owner Pro (Rs 1,299/mo)';
       case 'success_fee':
         return 'Platform Success Fee';
     }
@@ -710,9 +745,10 @@ export const AdminPage: React.FC = () => {
                 <thead className="bg-slate-50 text-slate-500 uppercase tracking-wider font-bold border-b border-slate-200">
                   <tr>
                     <th className="py-3 px-4">User</th>
-                    <th className="py-3 px-4">Purpose</th>
+                    <th className="py-3 px-4">Purpose & Plan</th>
                     <th className="py-3 px-4">Amount</th>
                     <th className="py-3 px-4">Wallet & Ref ID</th>
+                    <th className="py-3 px-4">Payment Screenshot</th>
                     <th className="py-3 px-4">Property Link</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Date</th>
@@ -735,29 +771,61 @@ export const AdminPage: React.FC = () => {
 
                           <td className="py-3.5 px-4">
                             <span
-                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${getPurposeBadge(
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border inline-block ${getPurposeBadge(
                                 pay.purpose
                               )}`}
                             >
-                              {getPurposeLabel(pay.purpose)}
+                              {getPurposeLabel(pay)}
                             </span>
                           </td>
 
-                          <td className="py-3.5 px-4 font-extrabold text-emerald-700 text-sm">
+                          <td className="py-3.5 px-4 font-extrabold text-emerald-700 text-sm whitespace-nowrap">
                             रू {pay.amount.toLocaleString('en-IN')}
                           </td>
 
                           <td className="py-3.5 px-4">
-                            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
-                              <span
-                                className={`px-1.5 py-0.2 rounded text-[10px] uppercase text-white font-extrabold ${
-                                  pay.method === 'esewa' ? 'bg-emerald-600' : 'bg-purple-600'
-                                }`}
-                              >
-                                {pay.method}
-                              </span>
-                              <span>{pay.transaction_ref}</span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                                <span
+                                  className={`px-1.5 py-0.2 rounded text-[10px] uppercase text-white font-extrabold ${
+                                    pay.method === 'esewa' ? 'bg-emerald-600' : 'bg-purple-600'
+                                  }`}
+                                >
+                                  {pay.method}
+                                </span>
+                                <span className="text-slate-800">{pay.transaction_ref}</span>
+                              </div>
+                              {pay.note && (
+                                <p className="text-[10px] text-slate-500 italic bg-slate-50 p-1 rounded border border-slate-100 max-w-xs truncate" title={pay.note}>
+                                  "{pay.note}"
+                                </p>
+                              )}
                             </div>
+                          </td>
+
+                          {/* Screenshot Proof */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {pay.screenshot_url ? (
+                              <button
+                                onClick={() => setSelectedScreenshotModal(pay)}
+                                className="group inline-flex items-center gap-2 p-1 pr-2 rounded-xl border border-slate-200 hover:border-emerald-500 bg-white hover:bg-emerald-50/40 transition-all text-left cursor-pointer"
+                                title="Click to view full screenshot"
+                              >
+                                <img
+                                  src={pay.screenshot_url}
+                                  alt="Proof thumbnail"
+                                  className="w-9 h-9 rounded-lg object-cover bg-slate-100 shrink-0 border border-slate-200"
+                                />
+                                <div className="flex flex-col">
+                                  <span className="text-[11px] font-bold text-slate-800 group-hover:text-emerald-700 flex items-center gap-1">
+                                    <Eye className="w-3 h-3 text-emerald-600" /> View Proof
+                                  </span>
+                                  <span className="text-[9px] text-slate-400">Click to enlarge</span>
+                                </div>
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">No screenshot</span>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -775,12 +843,12 @@ export const AdminPage: React.FC = () => {
 
                           <td className="py-3.5 px-4">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                              className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
                                 pay.status === 'verified'
-                                  ? 'bg-emerald-100 text-emerald-800'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
                                   : pay.status === 'pending'
-                                  ? 'bg-amber-100 text-amber-800 animate-pulse'
-                                  : 'bg-rose-100 text-rose-800'
+                                  ? 'bg-amber-100 text-amber-800 border border-amber-200 animate-pulse'
+                                  : 'bg-rose-100 text-rose-800 border border-rose-200'
                               }`}
                             >
                               {pay.status}
@@ -796,7 +864,7 @@ export const AdminPage: React.FC = () => {
                               <div className="flex items-center justify-end gap-1.5">
                                 <button
                                   onClick={() => handleVerifyPayment(pay.id)}
-                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors shadow-2xs"
+                                  className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
                                   title="Verify and activate feature"
                                 >
                                   <Check className="w-3.5 h-3.5" />
@@ -804,7 +872,7 @@ export const AdminPage: React.FC = () => {
                                 </button>
                                 <button
                                   onClick={() => handleRejectPayment(pay.id)}
-                                  className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors shadow-2xs"
+                                  className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
                                   title="Reject transaction"
                                 >
                                   <X className="w-3.5 h-3.5" />
@@ -812,7 +880,7 @@ export const AdminPage: React.FC = () => {
                                 </button>
                               </div>
                             ) : (
-                              <span className="text-[11px] text-slate-400">Processed</span>
+                              <span className="text-[11px] text-slate-400 capitalize">{pay.status}</span>
                             )}
                           </td>
                         </tr>
@@ -820,7 +888,7 @@ export const AdminPage: React.FC = () => {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="text-center py-10 text-slate-400">
+                      <td colSpan={9} className="text-center py-10 text-slate-400">
                         No payments found matching criteria.
                       </td>
                     </tr>
@@ -949,30 +1017,42 @@ export const AdminPage: React.FC = () => {
         {activeTab === 'users' && (
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
             {/* Filter Toolbar */}
-            <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
               <div className="relative max-w-sm w-full">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search user name or email..."
+                  placeholder="Search user name, email, or phone..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500">Filter Role:</span>
-                <select
-                  value={userRoleFilter}
-                  onChange={(e) => setUserRoleFilter(e.target.value)}
-                  className="text-xs font-semibold p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
-                >
-                  <option value="all">All Roles</option>
-                  <option value="hunter">Hunter</option>
-                  <option value="owner">Owner</option>
-                  <option value="admin">Admin</option>
-                </select>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500">Filter Role:</span>
+                  <select
+                    value={userRoleFilter}
+                    onChange={(e) => setUserRoleFilter(e.target.value)}
+                    className="text-xs font-semibold p-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                  >
+                    <option value="all">All Roles</option>
+                    <option value="hunter">Hunter</option>
+                    <option value="owner">Owner</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-amber-50/70 border border-amber-200 px-3 py-2 rounded-xl cursor-pointer hover:bg-amber-100/60 transition-colors select-none">
+                  <input
+                    type="checkbox"
+                    checked={userPendingOnly}
+                    onChange={(e) => setUserPendingOnly(e.target.checked)}
+                    className="rounded text-amber-600 focus:ring-amber-500"
+                  />
+                  <span>Has Pending Payment ({payments.filter((p) => p.status === 'pending').length})</span>
+                </label>
               </div>
             </div>
 
@@ -983,61 +1063,287 @@ export const AdminPage: React.FC = () => {
                   <tr>
                     <th className="py-3 px-4">User Profile</th>
                     <th className="py-3 px-4">Email</th>
-                    <th className="py-3 px-4">Contact Phone</th>
-                    <th className="py-3 px-4">Current Role</th>
+                    <th className="py-3 px-4">Phone</th>
+                    <th className="py-3 px-4">Role</th>
+                    <th className="py-3 px-4">Active Plan / Sub</th>
+                    <th className="py-3 px-4">Payment Status</th>
                     <th className="py-3 px-4">Joined Date</th>
                     <th className="py-3 px-4 text-right">Change Role</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredProfiles.map((prof) => (
-                    <tr key={prof.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700">
-                            {prof.full_name?.charAt(0).toUpperCase() || 'U'}
-                          </div>
-                          <span className="font-bold text-slate-900">{prof.full_name}</span>
-                        </div>
-                      </td>
+                  {filteredProfiles.length > 0 ? (
+                    filteredProfiles.map((prof) => {
+                      const isSuperAdmin = prof.email.trim().toLowerCase() === 'alphanexora38@gmail.com';
+                      const hunterSub = hunterSubscriptions[prof.id];
+                      const ownerSub = ownerSubscriptions[prof.id];
+                      const userPayments = payments.filter((p) => p.user_id === prof.id);
+                      const pendingUserPayments = userPayments.filter((p) => p.status === 'pending');
+                      const verifiedUserPayments = userPayments.filter((p) => p.status === 'verified');
 
-                      <td className="py-3.5 px-4 text-slate-600">{prof.email}</td>
+                      return (
+                        <tr key={prof.id} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 shrink-0">
+                                {prof.full_name?.charAt(0).toUpperCase() || 'U'}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-slate-900">{prof.full_name}</span>
+                                  {isSuperAdmin && (
+                                    <span className="px-1.5 py-0.5 rounded bg-purple-600 text-white text-[9px] font-black uppercase tracking-wider flex items-center gap-0.5 shadow-2xs">
+                                      <Crown className="w-2.5 h-2.5 fill-current" /> Superadmin
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-mono">ID: {prof.id.slice(0, 8)}...</span>
+                              </div>
+                            </div>
+                          </td>
 
-                      <td className="py-3.5 px-4 text-slate-600">{prof.phone || '—'}</td>
+                          <td className="py-3.5 px-4 text-slate-600 font-medium">{prof.email}</td>
 
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
-                            prof.role === 'admin'
-                              ? 'bg-purple-100 text-purple-800'
-                              : prof.role === 'owner'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {prof.role}
-                        </span>
-                      </td>
+                          <td className="py-3.5 px-4 text-slate-600">{prof.phone || '—'}</td>
 
-                      <td className="py-3.5 px-4 text-slate-500">
-                        {prof.created_at ? new Date(prof.created_at).toLocaleDateString() : 'Active'}
-                      </td>
+                          <td className="py-3.5 px-4">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
+                                prof.role === 'admin'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : prof.role === 'owner'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {prof.role}
+                            </span>
+                          </td>
 
-                      <td className="py-3.5 px-4 text-right">
-                        <select
-                          value={prof.role}
-                          onChange={(e) => handleUpdateRole(prof.id, e.target.value as UserRole)}
-                          className="text-xs font-semibold py-1.5 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl focus:outline-none cursor-pointer"
-                        >
-                          <option value="hunter">Hunter</option>
-                          <option value="owner">Owner</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                          {/* Current Plan / Subscription */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {prof.role === 'hunter' ? (
+                              hunterSub ? (
+                                hunterSub.plan_tier === 'premium' ? (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 w-max">
+                                    <Sparkles className="w-3 h-3 text-amber-600" /> Premium (Unlimited)
+                                  </span>
+                                ) : hunterSub.plan_tier === 'basic' ? (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-300 w-max block">
+                                    Basic ({hunterSub.contacts_limit || 10} Contacts)
+                                  </span>
+                                ) : (
+                                  <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 w-max block">
+                                    Free (2 Contacts)
+                                  </span>
+                                )
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200 w-max block">
+                                  Free (2 Contacts)
+                                </span>
+                              )
+                            ) : prof.role === 'owner' ? (
+                              ownerSub && ownerSub.status === 'active' && ownerSub.price > 0 ? (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300 w-max block">
+                                  Owner Pro (Active)
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 w-max block">
+                                  Starter (Free)
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-slate-400 font-semibold text-[11px]">System Admin</span>
+                            )}
+                          </td>
+
+                          {/* Related Payment Status */}
+                          <td className="py-3.5 px-4 whitespace-nowrap">
+                            {pendingUserPayments.length > 0 ? (
+                              <button
+                                onClick={() => {
+                                  setActiveTab('payments');
+                                  setPaymentSearch(prof.email);
+                                }}
+                                className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse flex items-center gap-1 hover:bg-amber-200 cursor-pointer"
+                                title="Click to view and verify payment"
+                              >
+                                <span>⚠️ {pendingUserPayments.length} Pending</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </button>
+                            ) : verifiedUserPayments.length > 0 ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1 w-max">
+                                <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                <span>Verified ({verifiedUserPayments.length})</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 text-[11px]">No payments</span>
+                            )}
+                          </td>
+
+                          <td className="py-3.5 px-4 text-slate-500 whitespace-nowrap">
+                            {prof.created_at ? new Date(prof.created_at).toLocaleDateString() : 'Active'}
+                          </td>
+
+                          <td className="py-3.5 px-4 text-right">
+                            <select
+                              value={prof.role}
+                              onChange={(e) => handleUpdateRole(prof.id, e.target.value as UserRole)}
+                              disabled={isSuperAdmin}
+                              className={`text-xs font-semibold py-1.5 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl focus:outline-none cursor-pointer ${
+                                isSuperAdmin ? 'opacity-60 cursor-not-allowed' : ''
+                              }`}
+                            >
+                              <option value="hunter">Hunter</option>
+                              <option value="owner">Owner</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="text-center py-10 text-slate-400">
+                        No user profiles found matching your search.
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* SCREENSHOT LIGHTBOX / VERIFICATION MODAL */}
+        {selectedScreenshotModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-200">
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-extrabold text-slate-900 text-sm sm:text-base">
+                      Payment Proof & Verification
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-mono">
+                      Ref: {selectedScreenshotModal.transaction_ref} • {selectedScreenshotModal.method.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedScreenshotModal(null)}
+                  className="p-2 text-slate-400 hover:text-slate-700 rounded-xl hover:bg-slate-200/50 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto space-y-4">
+                {/* Image Preview */}
+                <div className="rounded-2xl border border-slate-200 bg-slate-950 p-2 flex items-center justify-center relative overflow-hidden group">
+                  {selectedScreenshotModal.screenshot_url ? (
+                    <img
+                      src={selectedScreenshotModal.screenshot_url}
+                      alt="Payment proof screenshot"
+                      className="max-h-[50vh] w-auto max-w-full rounded-xl object-contain shadow-md"
+                    />
+                  ) : (
+                    <div className="py-20 text-slate-400 text-xs">No screenshot image recorded.</div>
+                  )}
+                  {selectedScreenshotModal.screenshot_url && (
+                    <a
+                      href={selectedScreenshotModal.screenshot_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute bottom-4 right-4 px-3 py-1.5 rounded-xl bg-slate-900/80 text-white text-xs font-bold flex items-center gap-1.5 hover:bg-slate-900 transition-colors backdrop-blur-xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Open Full Image
+                    </a>
+                  )}
+                </div>
+
+                {/* Details Breakdown */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Amount</span>
+                    <span className="text-emerald-700 font-extrabold text-base">
+                      रू {selectedScreenshotModal.amount.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Purpose</span>
+                    <span className="text-slate-800 font-bold">
+                      {getPurposeLabel(selectedScreenshotModal)}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">User</span>
+                    <span className="text-slate-800 font-bold truncate block">
+                      {selectedScreenshotModal.user?.full_name || 'User'}
+                    </span>
+                    <span className="text-slate-400 text-[10px] truncate block">
+                      {selectedScreenshotModal.user?.email || 'N/A'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Status</span>
+                    <span
+                      className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase mt-0.5 ${
+                        selectedScreenshotModal.status === 'verified'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : selectedScreenshotModal.status === 'pending'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-rose-100 text-rose-800'
+                      }`}
+                    >
+                      {selectedScreenshotModal.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Optional Note */}
+                {selectedScreenshotModal.note && (
+                  <div className="p-3 bg-amber-50/60 rounded-2xl border border-amber-200 text-xs text-amber-900">
+                    <span className="font-bold block text-[10px] uppercase text-amber-700 mb-0.5">User Note:</span>
+                    "{selectedScreenshotModal.note}"
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="p-4 sm:p-5 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+                <button
+                  onClick={() => setSelectedScreenshotModal(null)}
+                  className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+
+                {selectedScreenshotModal.status === 'pending' && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleRejectPayment(selectedScreenshotModal.id)}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <X className="w-4 h-4" /> Reject Payment
+                    </button>
+                    <button
+                      onClick={() => handleVerifyPayment(selectedScreenshotModal.id)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                    >
+                      <Check className="w-4 h-4" /> Verify & Activate
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
